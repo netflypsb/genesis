@@ -42,8 +42,10 @@ log "Phase 1 — base OS packages"
 need_sudo
 $SUDO apt-get update -qq
 apt_install ca-certificates curl git tmux build-essential pkg-config \
-            python3 python3-pip python3-venv python3-dev \
+            python3 python3-pip python3-venv python3-dev pipx \
             unzip jq xdg-utils
+# pipx user path (idempotent)
+pipx ensurepath >/dev/null 2>&1 || true
 
 # --------------------------------------------------------- Phase 2: Node 22
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v | tr -d v | cut -d. -f1)" -lt 20 ]]; then
@@ -92,7 +94,7 @@ if [[ "$GENESIS_SKIP_OPENCLAW" != "1" ]]; then
     git -C "$GENESIS_HOME" reset --hard FETCH_HEAD
   fi
 
-  log "Phase 5c — ClawTeam-OpenClaw (local editable install)"
+  log "Phase 5c — ClawTeam-OpenClaw (pipx editable install)"
   CT_DIR="$HOME/ClawTeam-OpenClaw"
   if [[ ! -d "$CT_DIR/.git" ]]; then
     git clone --depth 1 https://github.com/win4r/ClawTeam-OpenClaw.git "$CT_DIR"
@@ -100,16 +102,19 @@ if [[ "$GENESIS_SKIP_OPENCLAW" != "1" ]]; then
     git -C "$CT_DIR" fetch --depth 1 origin main
     git -C "$CT_DIR" reset --hard FETCH_HEAD
   fi
-  python3 -m pip install --user --quiet -e "$CT_DIR"
-  # Ensure ~/bin shim
-  mkdir -p "$HOME/bin"
-  if [[ -z "$(command -v clawteam || true)" ]]; then
-    warn "clawteam not on PATH after pip install; check ~/.local/bin or pip user base"
+  # pipx handles PEP 668 correctly: isolated venv, bin on $HOME/.local/bin.
+  # Re-install is idempotent when we pass --force.
+  if pipx list 2>/dev/null | grep -q '^package clawteam'; then
+    pipx reinstall clawteam --python python3 >/dev/null || pipx install --force --editable "$CT_DIR"
   else
-    ln -sf "$(command -v clawteam)" "$HOME/bin/clawteam"
+    pipx install --editable "$CT_DIR"
   fi
-  if ! grep -q 'HOME/bin' "$HOME/.bashrc" 2>/dev/null; then
-    echo 'export PATH="$HOME/bin:$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+  export PATH="$HOME/.local/bin:$PATH"
+  if ! grep -q '.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+  fi
+  if ! command -v clawteam >/dev/null 2>&1; then
+    warn "clawteam not on PATH after pipx install; open a new shell or 'source ~/.bashrc'"
   fi
 fi
 
