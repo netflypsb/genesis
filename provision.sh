@@ -23,7 +23,23 @@ GENESIS_HOME="${GENESIS_HOME:-$HOME/genesis}"
 GENESIS_SKIP_SKILLS="${GENESIS_SKIP_SKILLS:-0}"
 GENESIS_SKIP_MCPS="${GENESIS_SKIP_MCPS:-0}"
 GENESIS_SKIP_OPENCLAW="${GENESIS_SKIP_OPENCLAW:-0}"
-GENESIS_OLLAMA_HOST="${GENESIS_OLLAMA_HOST:-http://host.docker.internal:11434}"
+GENESIS_OLLAMA_HOST="${GENESIS_OLLAMA_HOST:-}"
+
+# Auto-detect the best Ollama endpoint if not provided.
+# Order of preference:
+#   1. WSL mirrored networking: localhost reaches Windows-side Ollama directly.
+#   2. WSL NAT: host.docker.internal routes to the Windows host.
+#   3. VirtualBox NAT: 10.0.2.2 is the host from a guest VM.
+if [[ -z "$GENESIS_OLLAMA_HOST" ]]; then
+  for cand in "http://localhost:11434" "http://host.docker.internal:11434" "http://10.0.2.2:11434"; do
+    if curl -fsS --max-time 2 "${cand}/api/tags" >/dev/null 2>&1; then
+      GENESIS_OLLAMA_HOST="$cand"
+      break
+    fi
+  done
+  # Last-resort fallback if none reachable (non-fatal; user can edit settings.json)
+  GENESIS_OLLAMA_HOST="${GENESIS_OLLAMA_HOST:-http://host.docker.internal:11434}"
+fi
 
 log()  { printf '\n\033[1;36m==>\033[0m %s\n' "$*"; }
 step() { printf '  \033[1;32m•\033[0m %s\n' "$*"; }
