@@ -44,7 +44,7 @@ param(
     [ValidateSet("wsl", "vm")]
     [string] $Mode = "wsl",
 
-    [string] $Distro = "Ubuntu-24.04",
+    [string] $Distro = "Ubuntu",
     [switch] $SkipSkills,
     [switch] $SkipMcps,
     [switch] $SkipOpenClaw,
@@ -142,19 +142,11 @@ if ($ollamaCmd) {
             Start-Sleep -Seconds 3
         }
     }
-    # Signin check: `ollama whoami` returns success if signed in.
-    $signedIn = $false
-    try {
-        $out = & $ollamaCmd.Source whoami 2>&1
-        if ($LASTEXITCODE -eq 0 -and $out -notmatch "not signed") { $signedIn = $true }
-    } catch {}
-    if ($signedIn) {
-        Write-Ok "ollama signed-in"
-    } else {
-        Write-Warn "Not signed in to ollama.com. Cloud models need 'ollama signin'."
-        if ($AutoSignin -or (Read-YesNo "Run 'ollama signin' now?" $true)) {
-            & $ollamaCmd.Source signin
-        }
+    # `ollama signin` is idempotent: safe to run even if already signed-in
+    # (prints "You are already signed in as ..." and exits 0). We don't try to
+    # detect signin status ourselves since there's no stable CLI for it.
+    if ($AutoSignin -or (Read-YesNo "Run 'ollama signin' now? (skip if already signed in)" $true)) {
+        & $ollamaCmd.Source signin
     }
 } else {
     Write-Warn "Continuing without host-side Ollama. You'll need to set ANTHROPIC_BASE_URL manually later."
@@ -180,19 +172,32 @@ if ($Mode -eq "wsl") {
     $distros = @(wsl -l -q 2>$null | ForEach-Object { ($_ -replace '\x00','').Trim() } | Where-Object { $_ -and $_ -notmatch '^docker-desktop' })
     if ($distros -notcontains $Distro) {
         Write-Warn "Distro '$Distro' not installed."
-        if (Read-YesNo "Install '$Distro' now? (downloads ~600 MB)" $true) {
-            wsl --install -d $Distro --no-launch
-            Write-Ok "Requested install of $Distro. If first run, open the distro once to create a user, then rerun."
-            exit 2
-        } elseif ($distros.Count -gt 0) {
-            $Distro = $distros[0]
-            Write-Warn "Falling back to existing distro: $Distro"
-        } else {
-            Write-Err "No usable distro. Run: wsl --install -d Ubuntu-24.04"
-            exit 1
+        if ($distros.Count -gt 0) {
+            $fallback = $distros[0]
+            if (Read-YesNo "Use existing distro '$fallback' instead?" $true) {
+                $Distro = $fallback
+                Write-Ok "using distro: $Distro"
+            }
         }
+        if ($distros -notcontains $Distro) {
+            if (Read-YesNo "Install '$Distro' now? (downloads ~600 MB)" $true) {
+                wsl --install -d $Distro --no-launch
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Err "wsl --install failed. Your WSL version may not have '$Distro' in its catalog."
+                    Write-Warn "Run 'wsl --list --online' to see valid names, then rerun with -Distro <name>."
+                    Write-Warn "Common valid names: Ubuntu, Ubuntu-22.04, Ubuntu-24.04, Debian"
+                    exit 1
+                }
+                Write-Ok "Installed $Distro. Open it once to create a user, then rerun this script."
+                exit 2
+            } else {
+                Write-Err "No usable distro. Aborting."
+                exit 1
+            }
+        }
+    } else {
+        Write-Ok "using distro: $Distro"
     }
-    Write-Ok "using distro: $Distro"
 
     # Copy provision.sh into the distro home and exec it.
     Write-Step "pushing provision.sh into ${Distro}:~/genesis-provision.sh"
