@@ -127,24 +127,59 @@ if (-not $ollamaCmd) {
 }
 if ($ollamaCmd) {
     Write-Ok  "ollama: $($ollamaCmd.Source)"
-    # Check daemon
+
+    # Ensure OLLAMA_HOST=0.0.0.0:11434 so WSL can reach the daemon via
+    # host.docker.internal. Default binds to 127.0.0.1 which blocks WSL.
+    $currentHost = [Environment]::GetEnvironmentVariable("OLLAMA_HOST", "User")
+    if ($currentHost -ne "0.0.0.0:11434") {
+        Write-Step "setting OLLAMA_HOST=0.0.0.0:11434 (User scope) so WSL can connect"
+        [Environment]::SetEnvironmentVariable("OLLAMA_HOST", "0.0.0.0:11434", "User")
+        $env:OLLAMA_HOST = "0.0.0.0:11434"
+        # Restart Ollama for the env change to take effect
+        Get-Process -Name "ollama*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+    }
+
+    # Firewall rule for WSL<->Ollama (inbound 11434, user's current profile)
+    $fwRule = Get-NetFirewallRule -DisplayName "Ollama (WSL)" -ErrorAction SilentlyContinue
+    if (-not $fwRule) {
+        try {
+            New-NetFirewallRule -DisplayName "Ollama (WSL)" -Direction Inbound -Protocol TCP `
+                -LocalPort 11434 -Action Allow -Profile Any -ErrorAction Stop | Out-Null
+            Write-Ok "firewall rule 'Ollama (WSL)' added"
+        } catch {
+            Write-Warn "could not add firewall rule (needs admin). WSL->Ollama may be blocked."
+            Write-Warn "run as admin: New-NetFirewallRule -DisplayName 'Ollama (WSL)' -Direction Inbound -Protocol TCP -LocalPort 11434 -Action Allow"
+        }
+    }
+
+    # Check daemon. If OLLAMA_HOST was just changed we stopped it, so try to start.
     $reachable = $false
     try {
         $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 -Uri "http://localhost:11434/api/tags"
         if ($r.StatusCode -eq 200) { $reachable = $true }
     } catch {}
+    if (-not $reachable) {
+        Write-Warn "daemon NOT reachable on localhost:11434. Starting it..."
+        $appExe = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama app.exe"
+        if (Test-Path $appExe) {
+            Start-Process -FilePath $appExe
+        } else {
+            Start-Process -FilePath $ollamaCmd.Source -ArgumentList "serve" -WindowStyle Hidden
+        }
+        Start-Sleep -Seconds 4
+        try {
+            $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 -Uri "http://localhost:11434/api/tags"
+            if ($r.StatusCode -eq 200) { $reachable = $true }
+        } catch {}
+    }
     if ($reachable) {
         Write-Ok "daemon reachable at http://localhost:11434"
     } else {
-        Write-Warn "daemon NOT reachable. Launch Ollama Desktop, then rerun this script."
-        if (Read-YesNo "Try to start Ollama now?" $true) {
-            Start-Process -FilePath $ollamaCmd.Source -ArgumentList "serve" -WindowStyle Hidden
-            Start-Sleep -Seconds 3
-        }
+        Write-Warn "daemon still not reachable. Launch Ollama Desktop manually, then rerun."
     }
-    # `ollama signin` is idempotent: safe to run even if already signed-in
-    # (prints "You are already signed in as ..." and exits 0). We don't try to
-    # detect signin status ourselves since there's no stable CLI for it.
+
+    # `ollama signin` is idempotent; safe to run even if already signed-in.
     if ($AutoSignin -or (Read-YesNo "Run 'ollama signin' now? (skip if already signed in)" $true)) {
         & $ollamaCmd.Source signin
     }
