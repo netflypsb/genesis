@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "servers": {
+    "playwright": {
+      "label": "Playwright - browser automation",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "requires": ["node", "npx"],
+      "post": ["npx -y playwright install --with-deps chromium"],
+      "default": true
+    },
+    "fetch": {
+      "label": "Fetch - HTTP/URL fetching",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "requires": ["uv", "uvx"],
+      "default": true
+    },
+    "git": {
+      "label": "Git - repository operations",
+      "command": "uvx",
+      "args": ["mcp-server-git"],
+      "requires": ["uv", "uvx", "git"],
+      "default": true
+    },
+    "k-01": {
+      "label": "K-01 - Genesis in-house MCP (vendored)",
+      "command": "node",
+      "args": ["/opt/genesis/mcp/K-01-mcp/dist/index.js"],
+      "requires": ["node"],
+      "install": "git+build",
+      "repo": "vendor/mcp/K-01-mcp",
+      "default": false
+    }
+  }
+}

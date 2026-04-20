@@ -1,0 +1,49 @@
+# ---------- Local state / scratch ----------
+*.bak
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# ---------- Editors ----------
+.vscode/
+.idea/
+
+# ---------- Node (under mcp/ vendored sources) ----------
+node_modules/
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# ---------- Python ----------
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.uv/
+*.egg-info/
+
+# ---------- Nested .git dirs in vendored MCP subtrees ----------
+# (flatten before commit; leave this as a belt-and-braces guard)
+mcp/*/.git/
+mcp/*/*/.git/
+
+# ---------- Vagrant / VirtualBox ----------
+.vagrant/
+*.box
+
+# ---------- Local test / sandbox ----------
+/tmp/
+/test-output/
+/sandbox/
+
+# ---------- Historical planning notes (kept local) ----------
+plan01/
+
+# ---------- Superseded top-level scripts (moved into setup/) ----------
+/setup-claude.ps1
+/setup-clawteam-wsl.ps1
+/settings.json
+

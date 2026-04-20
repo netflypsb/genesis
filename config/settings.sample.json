@@ -1,0 +1,38 @@
+{
+    "env": {
+        "ANTHROPIC_BASE_URL": "http://localhost:11434",
+        "ANTHROPIC_AUTH_TOKEN": "ollama",
+        "ANTHROPIC_API_KEY": "",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "kimi-k2.5:cloud",
+        "ANTHROPIC_MODEL": "kimi-k2.5:cloud",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "kimi-k2.5:cloud",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+    },
+    "autoUpdatesChannel": "latest",
+    "mcpServers": {
+        "playwright": {
+            "command": "npx",
+            "args": ["-y", "@playwright/mcp@latest"]
+        },
+        "fetch": {
+            "command": "uvx",
+            "args": ["mcp-server-fetch"]
+        },
+        "git": {
+            "command": "uvx",
+            "args": ["mcp-server-git"]
+        }
+    },
+    "permissions": {
+        "allow": [
+            "Read",
+            "Write",
+            "Edit",
+            "Bash",
+            "Glob",
+            "Grep",
+            "Bash(git *)",
+            "Bash(clawteam *)"
+        ]
+    }
+}

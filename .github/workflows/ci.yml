@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  psscriptanalyzer:
+    name: PSScriptAnalyzer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+      - name: Run analyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path setup -Recurse -Severity Error,Warning
+          $results | Format-Table
+          if ($results | Where-Object Severity -eq 'Error') { exit 1 }
+
+  json-validate:
+    name: Validate JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate all *.json
+        run: |
+          set -e
+          for f in $(find . -name '*.json' -not -path '*/node_modules/*' -not -path '*/vendor/*'); do
+            echo "Validating $f"
+            python -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+          done
