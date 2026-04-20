@@ -30,7 +30,7 @@ if (Test-Path $TargetDir) {
     git clone $RepoUrl $TargetDir
 }
 
-$wizard = Join-Path $TargetDir "setup\setup-clawteam-wsl.ps1"
+$wizard = Join-Path $TargetDir "setup\setup-genesis.ps1"
 Write-Host ""
 Write-Host "  Launching wizard: $wizard" -ForegroundColor Green
-& $wizard
+& $wizard @args

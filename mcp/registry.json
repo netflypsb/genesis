@@ -1,5 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
+  "scope": "user",
+  "note": "Installed via `claude mcp add --scope user <name> -- <command> <args...>`. Stored in ~/.claude.json and visible across every project for the current user.",
   "servers": {
     "playwright": {
       "label": "Playwright - browser automation",
