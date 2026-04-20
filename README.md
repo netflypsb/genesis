@@ -117,16 +117,25 @@ genesis/
 
 ## Verification
 
-After the wizard finishes, inside the sandbox:
+**Inside the WSL sandbox** (`wsl -d Ubuntu`):
 
 ```bash
 claude --version
 claude mcp list              # should show fetch, git, playwright at user-scope
 openclaw --version           # if you didn't pass -SkipOpenClaw
 clawteam --version
-clawteam config health
 ls ~/.claude/skills          # bundled skills
+curl http://host.docker.internal:11434/api/tags   # WSL can reach Windows Ollama
 ```
+
+**On the Windows host** (PowerShell, not WSL — Ollama runs here only):
+
+```powershell
+ollama run gpt-oss:120b-cloud "hi"   # smoke-test the cloud model
+ollama whoami                         # confirm signed in
+```
+
+> Ollama is a **Windows-side daemon**. Do not `sudo snap install ollama` inside WSL — the sandbox reaches the host's Ollama at `http://host.docker.internal:11434` and that's all Claude Code needs.
 
 ## Troubleshooting
 

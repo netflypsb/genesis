@@ -232,11 +232,16 @@ if ($Mode -eq "wsl") {
     Write-Ok "WSL provisioning complete"
 
     Write-Header "Next steps"
-    Write-Host "  wsl -d $Distro                     # enter the sandbox" -ForegroundColor White
+    Write-Host "Inside WSL (run 'wsl -d $Distro' first):" -ForegroundColor Cyan
     Write-Host "  claude mcp list                    # verify MCP user-scope entries" -ForegroundColor White
-    Write-Host "  clawteam --version                 # verify ClawTeam" -ForegroundColor White
-    Write-Host "  openclaw --version                 # verify OpenClaw" -ForegroundColor White
-    Write-Host '  ollama run gpt-oss:120b-cloud hi   # test cloud model (on host)' -ForegroundColor White
+    Write-Host "  clawteam --version                 # verify ClawTeam"               -ForegroundColor White
+    Write-Host "  openclaw --version                 # verify OpenClaw"                -ForegroundColor White
+    Write-Host "  curl http://host.docker.internal:11434/api/tags  # WSL->host Ollama" -ForegroundColor White
+    Write-Host ""
+    Write-Host "On Windows (this PowerShell, not WSL):" -ForegroundColor Cyan
+    Write-Host '  ollama run gpt-oss:120b-cloud "hi"  # smoke-test the cloud model'    -ForegroundColor White
+    Write-Host ""
+    Write-Host "Ollama runs only on Windows. WSL reaches it via host.docker.internal." -ForegroundColor DarkGray
 }
 
 if ($Mode -eq "vm") {
