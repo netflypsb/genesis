@@ -82,6 +82,9 @@ Vagrant.configure("2") do |config|
     set -e
     # /vagrant is mounted read-only (intentional, M2.5 isolation). Don't
     # chmod +x — bash doesn't need the exec bit.
-    GENESIS_HOME=/vagrant bash /vagrant/provision.sh
+    # CRLF guard: if the host checkout has \\r\\n (Windows git autocrlf),
+    # pipe through `tr -d` so bash doesn't choke on `set -o pipefail\\r`.
+    # .gitattributes now forces LF, but old checkouts may still be CRLF.
+    GENESIS_HOME=/vagrant bash -c "$(tr -d '\\r' < /vagrant/provision.sh)"
   SHELL
 end

@@ -1,0 +1,25 @@
+# Force LF for anything bash / VM-side will read, regardless of host OS.
+# Windows checkouts otherwise default to CRLF via core.autocrlf, which
+# breaks `#!/usr/bin/env bash` scripts and heredocs.
+
+*.sh           text eol=lf
+*.bash         text eol=lf
+Vagrantfile    text eol=lf
+Vagrantfile.*  text eol=lf
+*.toml         text eol=lf
+*.json         text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.md           text eol=lf
+
+# Windows-side only — keep CRLF friendly
+*.ps1          text eol=crlf
+*.psm1         text eol=crlf
+*.bat          text eol=crlf
+*.cmd          text eol=crlf
+
+# Binaries
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
