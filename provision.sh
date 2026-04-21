@@ -220,6 +220,7 @@ if [[ "$GENESIS_OPENCLAW_DAEMON" == "1" ]]; then
     if openclaw onboard \
          --install-daemon \
          --non-interactive \
+         --accept-risk \
          --auth-choice ollama \
          --workspace "$HOME/.openclaw/workspace" \
          --skip-channels --skip-search --skip-ui --skip-health \
