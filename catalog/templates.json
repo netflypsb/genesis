@@ -14,18 +14,18 @@
       "name": "finance-desk",
       "source": "templates/finance-desk.toml",
       "install_to": "~/.clawteam/templates/finance-desk.toml",
-      "default": false,
+      "default": true,
       "tags": ["bundled", "finance"],
       "requires_mcp": ["vibe-trading"],
-      "description": "Research-to-backtest pipeline: analyst -> strategist -> backtester using Vibe-Trading MCP"
+      "description": "Research-to-backtest pipeline: analyst -> strategist -> backtester. Requires the opt-in vibe-trading MCP to actually run the finance tools; enable with -Enable vibe-trading."
     },
     {
       "name": "deep-research",
       "source": "templates/deep-research.toml",
       "install_to": "~/.clawteam/templates/deep-research.toml",
-      "default": false,
+      "default": true,
       "tags": ["bundled", "research"],
-      "description": "Literature review pipeline: searcher -> reader -> synthesizer using fetch + playwright MCPs"
+      "description": "Literature review pipeline: searcher -> reader -> synthesizer using fetch + playwright MCPs (both default-on)"
     },
     {
       "name": "code-review",

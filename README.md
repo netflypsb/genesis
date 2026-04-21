@@ -308,8 +308,8 @@ Claude reads `~/.claude/skills/clawteam/SKILL.md` and runs the CLI itself. Becau
 | Template | Source | Default? | Roles | Use case |
 |---|---|---|---|---|
 | `genesis-coder` | Genesis | ✅ on | planner, builder, reviewer, scribe | General-purpose coding with git worktree isolation |
-| `finance-desk` | Genesis | opt-in | analyst, strategist, backtester | Research → strategy code → backtest. Needs `vibe-trading` MCP. |
-| `deep-research` | Genesis | opt-in | searcher, reader, synthesizer | Literature review → cited report. Uses fetch + playwright MCPs. |
+| `finance-desk` | Genesis | ✅ on | analyst, strategist, backtester | Research → strategy code → backtest. Needs `vibe-trading` MCP (opt-in) to actually run finance tools. |
+| `deep-research` | Genesis | ✅ on | searcher, reader, synthesizer | Literature review → cited report. Uses fetch + playwright MCPs (both on by default). |
 | `code-review` | ClawTeam upstream | ✅ bundled | lead + reviewers | Review a PR / codebase |
 | `hedge-fund` | ClawTeam upstream | ✅ bundled | 7-agent (value/growth/technical/fundamentals/sentiment analysts + risk + portfolio mgr) | Financial research |
 | `research-paper` | ClawTeam upstream | ✅ bundled | varied | Research paper drafting |
@@ -317,15 +317,14 @@ Claude reads `~/.claude/skills/clawteam/SKILL.md` and runs the CLI itself. Becau
 
 See all: `clawteam template list` (inside sandbox).
 
-**Opt-in templates** ship disabled by default. Enable during install:
+**All Genesis team templates are installed by default** — installing a TOML costs nothing. What _is_ opt-in is the MCPs some templates need to do their work:
 
 ```powershell
-.\setup\setup-genesis.ps1 -Enable vibe-trading,finance-desk        # finance stack
-.\setup\setup-genesis.ps1 -Enable deep-research                    # research stack
-.\setup\setup-genesis.ps1 -Enable k-01,deep-research               # research + 58-tool doc intelligence
+.\setup\setup-genesis.ps1 -VMFirst -Enable vibe-trading    # wires finance-desk to real finance tools
+.\setup\setup-genesis.ps1 -VMFirst -Enable k-01            # wires deep-research to 58 doc-intelligence tools
 ```
 
-Re-running the wizard with `-Enable` later is safe; it's additive.
+Re-running with `-Enable` later is safe; it's additive.
 
 ### Opt-in MCP servers (catalog)
 

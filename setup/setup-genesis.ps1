@@ -76,8 +76,8 @@ param(
     [switch] $AutoSignin,
     [switch] $VMFirst,
     [string] $SyncProjects = "",
-    [string] $Enable = "",
-    [string] $Disable = "",
+    [string[]] $Enable = @(),
+    [string[]] $Disable = @(),
     [string] $RepoUrl = "https://github.com/netflypsb/genesis.git",
     [string] $RepoRef = "main"
 )
