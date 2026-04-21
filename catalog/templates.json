@@ -30,24 +30,28 @@
     {
       "name": "code-review",
       "upstream": true,
+      "default": true,
       "tags": ["upstream"],
       "description": "ClawTeam built-in: PR / codebase review with lead + reviewers"
     },
     {
       "name": "hedge-fund",
       "upstream": true,
+      "default": true,
       "tags": ["upstream", "finance"],
       "description": "ClawTeam built-in: 7-agent investment team (value/growth/technical/fundamentals/sentiment analysts + risk manager + portfolio manager)"
     },
     {
       "name": "research-paper",
       "upstream": true,
+      "default": true,
       "tags": ["upstream", "research"],
       "description": "ClawTeam built-in: research paper generation / analysis"
     },
     {
       "name": "strategy-room",
       "upstream": true,
+      "default": true,
       "tags": ["upstream", "planning"],
       "description": "ClawTeam built-in: cross-functional strategy team (strategy-lead / systems-analyst / delivery-planner / risk-mapper / decision-editor)"
     }

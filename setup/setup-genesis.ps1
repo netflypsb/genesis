@@ -356,8 +356,10 @@ if ($Mode -eq "wsl") {
     if ($SkipSkills)   { $envFlags += "GENESIS_SKIP_SKILLS=1" }
     if ($SkipMcps)     { $envFlags += "GENESIS_SKIP_MCPS=1" }
     if ($SkipOpenClaw) { $envFlags += "GENESIS_SKIP_OPENCLAW=1" }
-    if ($Enable)       { $envFlags += "GENESIS_ENABLE='$Enable'" }
-    if ($Disable)      { $envFlags += "GENESIS_DISABLE='$Disable'" }
+    $enableFlat  = ((@($Enable)  -join ',') -replace ',\s+', ',').Trim(',')
+    $disableFlat = ((@($Disable) -join ',') -replace ',\s+', ',').Trim(',')
+    if ($enableFlat)  { $envFlags += "GENESIS_ENABLE='$enableFlat'" }
+    if ($disableFlat) { $envFlags += "GENESIS_DISABLE='$disableFlat'" }
 
     $envStr = $envFlags -join " "
     Write-Header "Phase 3 - provisioning inside WSL ($Distro)"
@@ -452,8 +454,13 @@ if ($Mode -eq "vm") {
     Write-Header "Phase 3 - vagrant up"
     Push-Location $RepoRoot
     # Export catalog + skip env for the Vagrantfile to forward to provision.sh.
-    $env:GENESIS_ENABLE        = $Enable
-    $env:GENESIS_DISABLE       = $Disable
+    # Normalise array-typed params: support both "-Enable a,b" (array form)
+    # and '"-Enable a,b"' (single string) and multiple "-Enable a -Enable b".
+    # Re-split on commas to collapse any mixed input into a single list.
+    $enableFlat  = ((@($Enable)  -join ',') -replace ',\s+', ',').Trim(',')
+    $disableFlat = ((@($Disable) -join ',') -replace ',\s+', ',').Trim(',')
+    $env:GENESIS_ENABLE        = $enableFlat
+    $env:GENESIS_DISABLE       = $disableFlat
     $env:GENESIS_SKIP_SKILLS   = if ($SkipSkills)   { "1" } else { "0" }
     $env:GENESIS_SKIP_MCPS     = if ($SkipMcps)     { "1" } else { "0" }
     $env:GENESIS_SKIP_OPENCLAW = if ($SkipOpenClaw) { "1" } else { "0" }
