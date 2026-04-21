@@ -142,12 +142,35 @@ else
 fi
 
 # -------------------------------------------------------- Phase 4: Claude Code
-if ! command -v claude >/dev/null 2>&1; then
-  log "Phase 4 — Claude Code"
+# WSL gotcha: `command -v claude` succeeds even when only the WINDOWS npm
+# claude is on PATH (via /mnt/c/... Win32 interop). That Windows binary
+# reads its config from %USERPROFILE%\.claude, so skills/MCPs/agents we
+# install into ~/.claude INSIDE WSL are invisible to it — the user sees
+# "No skills found" despite Phase 8 running.
+# Fix: require a Linux-native install under $HOME (or at least not /mnt/c).
+claude_path=$(command -v claude 2>/dev/null || true)
+is_native_claude=0
+if [[ -n "$claude_path" ]]; then
+  case "$claude_path" in
+    /mnt/c/*|/mnt/C/*) is_native_claude=0 ;;   # Windows shim, not usable
+    *)                 is_native_claude=1 ;;
+  esac
+fi
+if [[ "$is_native_claude" -ne 1 ]]; then
+  log "Phase 4 — Claude Code (Linux-native install)"
+  if [[ -n "$claude_path" ]]; then
+    warn "existing claude at $claude_path is the Windows binary; installing Linux-native so WSL skills work"
+  fi
   curl -fsSL https://claude.ai/install.sh | bash
   export PATH="$HOME/.local/bin:$PATH"
+  # Make the new Linux claude win over the Windows shim in future shells.
+  # claude.ai/install.sh already writes $HOME/.local/bin first, but only in
+  # non-interactive shells. Ensure .bashrc prepends it for interactive login too.
+  if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+  fi
 else
-  step "Claude Code already installed ($(claude --version 2>/dev/null || echo '?'))"
+  step "Claude Code already installed ($(claude --version 2>/dev/null || echo '?')) at $claude_path"
 fi
 
 # ---------------------------------------------------- Phase 5: OpenClaw + ClawTeam
@@ -523,7 +546,11 @@ fi
 
 # ---------------------------------------------------- Phase 11: summary
 log "Summary"
-printf '  claude:    %s\n'  "$(command -v claude   || echo 'MISSING')"
+_claude_sum=$(command -v claude 2>/dev/null || echo 'MISSING')
+case "$_claude_sum" in
+  /mnt/c/*|/mnt/C/*) _claude_sum="$_claude_sum  [!! WINDOWS SHIM — WSL skills will be invisible]" ;;
+esac
+printf '  claude:    %s\n'  "$_claude_sum"
 printf '  openclaw:  %s\n'  "$(command -v openclaw || echo 'skipped')"
 printf '  clawteam:  %s\n'  "$(command -v clawteam || echo 'skipped')"
 printf '  uv:        %s\n'  "$(command -v uv       || echo 'MISSING')"
