@@ -4,6 +4,41 @@ All notable changes to Genesis.
 
 ## [Unreleased] — phase 2 in progress
 
+## [0.2.4] — Milestone 2.5: VM-first enablement (phase2 branch)
+
+### Added
+- Wizard: `-VMFirst` flag (implies `-Mode vm`). After `vagrant up`:
+  - Exports SSH config to `~/.ssh/config.d/genesis` with alias `genesis-vm`.
+  - Ensures `~/.ssh/config` has `Include config.d/*` (safe, idempotent).
+  - Writes `~/.genesis/vm-config.json` for helper scripts to consume.
+  - Prints VM-first-tailored next-steps covering daily flow, VS Code
+    Remote-SSH, snapshots, and lifecycle commands.
+- Wizard: `-SyncProjects <path>` flag (opt-in). Mounts a Windows directory
+  into the VM at `/home/vagrant/shared-projects`. Default: no host dirs
+  mounted — the whole point of VM-first is isolation.
+- `scripts/open-vm-in-vscode.ps1` — brings up the VM if halted, refreshes
+  the ssh config, ensures Remote-SSH extension is installed, then launches
+  VS Code on `/home/vagrant/projects` (or a path you pass).
+- `docs/vm-snapshots.md` — snapshot workflow for rewinding risky agent
+  runs in ~1 minute.
+- `provision.sh` Phase 10b (new): creates `~/projects/` inside the VM with
+  a README hint. Guards with `GENESIS_VM_MODE` auto-detection.
+
+### Changed
+- `Vagrantfile` rewritten:
+  - Upgraded from `ubuntu/jammy64` (22.04) to `bento/ubuntu-24.04`.
+  - `/vagrant` now mounted **read-only** so agents can't scribble into
+    the Windows-side Genesis checkout.
+  - Memory / CPU / VM name overridable via `GENESIS_VM_MEMORY`,
+    `GENESIS_VM_CPUS`, `GENESIS_VM_NAME` env vars.
+  - `config.ssh.forward_agent = true` so host SSH agent (GitHub keys)
+    flows into the VM — `git push` works without PATs or copied keys.
+  - Forwards `GENESIS_VM_MODE=1` to provision.sh so Phase 10b fires.
+  - Optional Windows sync via `GENESIS_SYNC_PROJECTS` env var.
+- `provision.sh` auto-detects VM mode (`/etc/vagrant_box.info`,
+  `USER=vagrant`, `/vagrant` presence). Runs Phase 10b automatically in
+  both `-Mode vm` and `-VMFirst` paths.
+
 ## [0.2.2] — Milestone 2.1: clawteam skill + genesis-coder template (phase2 branch)
 
 ### Added

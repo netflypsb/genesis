@@ -30,6 +30,14 @@ GENESIS_SKIP_OPENCLAW="${GENESIS_SKIP_OPENCLAW:-0}"
 GENESIS_OLLAMA_HOST="${GENESIS_OLLAMA_HOST:-}"
 GENESIS_ENABLE="${GENESIS_ENABLE:-}"
 GENESIS_DISABLE="${GENESIS_DISABLE:-}"
+GENESIS_VM_MODE="${GENESIS_VM_MODE:-0}"
+
+# Auto-detect VM mode if not set (Vagrant leaves telltale markers).
+if [[ "$GENESIS_VM_MODE" != "1" ]]; then
+  if [[ -f /etc/vagrant_box.info ]] || [[ "$USER" == "vagrant" ]] || [[ -d /vagrant ]]; then
+    GENESIS_VM_MODE=1
+  fi
+fi
 
 # Auto-detect the best Ollama endpoint if not provided.
 # Order of preference:
@@ -351,6 +359,33 @@ if [[ -f "$CAT_TEMPLATES" ]]; then
       warn "template '$name' source missing: $src"
     fi
   done < <(catalog_enabled_items "$CAT_TEMPLATES")
+fi
+
+# ---------------------------------------------------- Phase 10b: VM-first workspace
+if [[ "$GENESIS_VM_MODE" == "1" ]]; then
+  log "Phase 10b — VM-first workspace"
+  mkdir -p "$HOME/projects"
+  step "created $HOME/projects (primary workspace for VM-first)"
+  # Friendly hint file so `ls ~` is self-explanatory.
+  if [[ ! -f "$HOME/projects/README.md" ]]; then
+    cat > "$HOME/projects/README.md" << 'EOF'
+# ~/projects — your workspace
+
+This directory lives on the VM's native ext4 disk — fast I/O, isolated from
+Windows. Clone or `git init` new work here (not under /vagrant which is
+read-only, and not under /home/vagrant/shared-projects unless you opted in
+via GENESIS_SYNC_PROJECTS).
+
+Example:
+  cd ~/projects
+  git clone git@github.com:you/my-app.git
+  cd my-app
+  clawteam launch genesis-coder --goal "..." --workspace --repo .
+
+Your host's ssh-agent is forwarded (see Vagrantfile ssh.forward_agent),
+so `git push` works without copying keys or PATs into the VM.
+EOF
+  fi
 fi
 
 # ---------------------------------------------------- Phase 11: summary

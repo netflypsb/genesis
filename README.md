@@ -62,26 +62,58 @@ git pull
 ### Wizard options
 
 ```powershell
-.\setup\setup-genesis.ps1                     # WSL2 backend (default)
-.\setup\setup-genesis.ps1 -Mode vm            # Vagrant + VirtualBox fallback
-.\setup\setup-genesis.ps1 -Distro Ubuntu-22.04  # pick a specific distro
-.\setup\setup-genesis.ps1 -SkipOpenClaw       # Claude Code + MCPs only
-.\setup\setup-genesis.ps1 -SkipSkills -SkipMcps  # minimal
-.\setup\setup-genesis.ps1 -AutoSignin         # auto-run `ollama signin`
+.\setup\setup-genesis.ps1                       # WSL2 backend (default)
+.\setup\setup-genesis.ps1 -VMFirst              # VM-first workflow (recommended for isolation + perf)
+.\setup\setup-genesis.ps1 -Mode vm              # VM backend, basic
+.\setup\setup-genesis.ps1 -Distro Ubuntu-22.04  # pick a specific WSL distro
+.\setup\setup-genesis.ps1 -SkipOpenClaw         # Claude Code + MCPs only
+.\setup\setup-genesis.ps1 -Enable vibe-trading  # opt-in catalog items
+.\setup\setup-genesis.ps1 -Disable playwright   # drop defaults
+.\setup\setup-genesis.ps1 -AutoSignin           # auto-run `ollama signin`
 ```
+
+## Three backends, one wizard
+
+| Backend | Command | Best for |
+|---|---|---|
+| **WSL** (default) | `setup-genesis.ps1` | Fast start, shared FS with Windows, no VM overhead |
+| **VM** (basic) | `setup-genesis.ps1 -Mode vm` | Stronger isolation than WSL |
+| **VM-first** | `setup-genesis.ps1 -VMFirst` | **Recommended** for multi-agent / daemon use. Native ext4 perf, hard host boundary, VS Code Remote-SSH auto-configured, snapshot workflow ready. See [`phase2/06-vm-first-workflow.md`](phase2/06-vm-first-workflow.md). |
 
 ## Two Claude Codes? Use the WSL one.
 
 You may have an older Claude Code install on Windows (`C:\Users\you\.claude\`). That's a **completely separate** process from the Claude Code that Genesis installs inside WSL (`/home/you/.claude/`). They don't share MCPs, skills, or settings. **For Genesis, always use the WSL one** — just run `claude` after `wsl -d Ubuntu`.
 
-## Your projects — inside or outside WSL?
+## Where your projects live
 
-| Location | Path from WSL | Speed | Accessible from Windows? |
+| Setup | Path inside sandbox | Speed | Host access |
 |---|---|---|---|
-| `~/projects/my-app` (inside WSL ext4) | `/home/you/projects/my-app` | **fast** | yes, via `\\wsl$\Ubuntu\home\you\projects\...` |
-| `C:\Users\you\code\my-app` (Windows NTFS) | `/mnt/c/Users/you/code/my-app` | ~10× slower for many small files | natively |
+| **VM-first** (recommended) | `/home/vagrant/projects/my-app` | **fast** (native ext4) | VS Code Remote-SSH via `.\scripts\open-vm-in-vscode.ps1`. No direct NTFS access unless you opt-in with `-SyncProjects`. |
+| **WSL, ext4** | `/home/you/projects/my-app` | **fast** (native ext4) | `\\wsl$\Ubuntu\home\you\projects\...` |
+| **WSL, Windows NTFS** | `/mnt/c/Users/you/code/my-app` | ~10× slower for small-file workloads | native |
 
-For heavy agent work (lots of file writes), clone to `~/projects/`. For projects you edit from both Windows apps and WSL, put them under `C:\Users\you\...` and accept the I/O cost.
+For heavy agent work (many file writes, git ops, node_modules, pytest), use one of the **fast** rows. WSL-on-`/mnt/c` is fine for light editing but not for swarms.
+
+### VM-first daily flow
+
+```powershell
+cd $env:USERPROFILE\genesis
+vagrant up                                      # 30-60s if halted
+.\scripts\open-vm-in-vscode.ps1                 # VS Code connects via Remote-SSH
+# OR
+vagrant ssh                                     # plain terminal
+# then inside: cd ~/projects/my-app && claude
+```
+
+Snapshots before risky agent runs:
+
+```powershell
+vagrant snapshot save pre-agent-run
+# ...run the risky thing...
+vagrant snapshot restore pre-agent-run          # rewinds in ~1 min
+```
+
+Full snapshot workflow: [`docs/vm-snapshots.md`](docs/vm-snapshots.md).
 
 ## Launching ClawTeam — two paths
 

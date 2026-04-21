@@ -38,14 +38,28 @@
     Comma-separated list of catalog item names to force-disable (overrides
     `default: true`). Matches names in catalog/*.json.
 
+.PARAMETER VMFirst
+    Implies -Mode vm. Exports the VM's SSH config for VS Code Remote-SSH,
+    writes ~/.genesis/vm-config.json, and prints VM-first next-steps
+    tailored for treating the VM as your daily-driver sandbox (projects
+    inside the VM, not on Windows).
+
+.PARAMETER SyncProjects
+    Absolute Windows path to sync into the VM at /home/vagrant/shared-projects.
+    Opt-in: default does NOT mount any Windows directories inside the VM
+    (the whole point of VM-first is isolation). Only set this if you want
+    to edit files from Windows-native apps.
+
 .PARAMETER RepoUrl
     Git URL to clone inside the sandbox. Default: https://github.com/netflypsb/genesis.git
 
 .EXAMPLE
     .\setup\setup-genesis.ps1
+    # WSL backend, default install
 
 .EXAMPLE
-    .\setup\setup-genesis.ps1 -Mode vm -SkipSkills
+    .\setup\setup-genesis.ps1 -VMFirst
+    # Vagrant VM, VM-first workflow, VS Code Remote-SSH ready
 
 .EXAMPLE
     .\setup\setup-genesis.ps1 -Enable vibe-trading -Disable playwright
@@ -60,11 +74,16 @@ param(
     [switch] $SkipMcps,
     [switch] $SkipOpenClaw,
     [switch] $AutoSignin,
+    [switch] $VMFirst,
+    [string] $SyncProjects = "",
     [string] $Enable = "",
     [string] $Disable = "",
     [string] $RepoUrl = "https://github.com/netflypsb/genesis.git",
     [string] $RepoRef = "main"
 )
+
+# -VMFirst implies -Mode vm (users don't have to type both).
+if ($VMFirst -and $Mode -ne "vm") { $Mode = "vm" }
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -336,19 +355,98 @@ if ($Mode -eq "vm") {
     $env:GENESIS_SKIP_SKILLS   = if ($SkipSkills)   { "1" } else { "0" }
     $env:GENESIS_SKIP_MCPS     = if ($SkipMcps)     { "1" } else { "0" }
     $env:GENESIS_SKIP_OPENCLAW = if ($SkipOpenClaw) { "1" } else { "0" }
+    if ($SyncProjects) {
+        if (Test-Path $SyncProjects) {
+            $env:GENESIS_SYNC_PROJECTS = $SyncProjects
+            Write-Ok "mounting $SyncProjects -> /home/vagrant/shared-projects (opt-in)"
+        } else {
+            Write-Warn "SyncProjects path not found: $SyncProjects (ignoring)"
+        }
+    }
     try {
         & vagrant up
         if ($LASTEXITCODE -ne 0) { throw "vagrant up failed" }
     } finally {
         Pop-Location
     }
-
     Write-Ok "VM provisioned"
+
+    # --- VM-first extras: ssh config + vm-config.json ---
+    if ($VMFirst) {
+        Write-Header "Phase 4 - VM-first setup"
+        $vmAlias  = "genesis-vm"
+        $sshDir   = Join-Path $env:USERPROFILE ".ssh"
+        $confDir  = Join-Path $sshDir "config.d"
+        $mainCfg  = Join-Path $sshDir "config"
+        $genCfg   = Join-Path $confDir "genesis"
+        New-Item -ItemType Directory -Force -Path $confDir | Out-Null
+
+        Push-Location $RepoRoot
+        try {
+            $sshRaw = & vagrant ssh-config 2>$null
+            if ($LASTEXITCODE -eq 0 -and $sshRaw) {
+                $sshCfg = ($sshRaw -split "`r?`n") -replace "^Host default\s*$", "Host $vmAlias" -join "`n"
+                Set-Content -Path $genCfg -Value $sshCfg -Encoding ASCII
+                Write-Ok "wrote $genCfg  (alias: $vmAlias)"
+            } else {
+                Write-Warn "vagrant ssh-config failed; skipping SSH config export"
+            }
+        } finally {
+            Pop-Location
+        }
+
+        if (-not (Test-Path $mainCfg)) {
+            Set-Content -Path $mainCfg -Value "Include config.d/*`n" -Encoding ASCII
+            Write-Ok "created $mainCfg"
+        } elseif ((Get-Content $mainCfg -Raw) -notmatch 'Include\s+config\.d') {
+            Add-Content -Path $mainCfg -Value "`nInclude config.d/*`n" -Encoding ASCII
+            Write-Ok "appended Include config.d/* to $mainCfg"
+        }
+
+        # vm-config.json — consumed by scripts/open-vm-in-vscode.ps1 and future helpers.
+        $genesisCfgDir = Join-Path $env:USERPROFILE ".genesis"
+        New-Item -ItemType Directory -Force -Path $genesisCfgDir | Out-Null
+        $vmCfg = [ordered]@{
+            mode         = "vm-first"
+            repoRoot     = $RepoRoot
+            vmName       = "genesis-dev"
+            sshAlias     = $vmAlias
+            defaultPath  = "/home/vagrant/projects"
+            provisioned  = (Get-Date).ToString("o")
+        } | ConvertTo-Json
+        Set-Content -Path (Join-Path $genesisCfgDir "vm-config.json") -Value $vmCfg -Encoding ASCII
+        Write-Ok "wrote ~/.genesis/vm-config.json"
+    }
+
     Write-Header "Next steps"
-    Write-Host "  cd $RepoRoot; vagrant ssh          # enter the VM" -ForegroundColor White
-    Write-Host "  claude mcp list                    # verify MCP user-scope entries" -ForegroundColor White
-    Write-Host "  vagrant halt                       # stop the VM" -ForegroundColor White
-    Write-Host "  vagrant destroy -f                 # tear it down" -ForegroundColor White
+    if ($VMFirst) {
+        Write-Host "Daily use (VM-first):" -ForegroundColor Cyan
+        Write-Host "  cd $RepoRoot; vagrant ssh           # enter the VM"                         -ForegroundColor White
+        Write-Host "  cd ~/projects && git clone <url>    # clone work into the VM's ext4 disk"   -ForegroundColor White
+        Write-Host "  claude                              # Claude Code with MCPs + skills"       -ForegroundColor White
+        Write-Host "  clawteam launch genesis-coder --goal '...' --workspace --repo ."           -ForegroundColor White
+        Write-Host ""
+        Write-Host "VS Code Remote-SSH (from Windows):" -ForegroundColor Cyan
+        Write-Host "  .\scripts\open-vm-in-vscode.ps1     # opens ~/projects in VS Code"          -ForegroundColor White
+        Write-Host "  .\scripts\open-vm-in-vscode.ps1 /home/vagrant/projects/my-app"              -ForegroundColor White
+        Write-Host ""
+        Write-Host "Snapshots (before risky agent runs):" -ForegroundColor Cyan
+        Write-Host "  cd $RepoRoot; vagrant snapshot save pre-agent-run"                          -ForegroundColor White
+        Write-Host "  vagrant snapshot restore pre-agent-run    # rewind in ~1 min"              -ForegroundColor White
+        Write-Host "  See docs/vm-snapshots.md for the full workflow"                            -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "VM lifecycle:" -ForegroundColor Cyan
+        Write-Host "  vagrant halt                        # stop, preserves state"               -ForegroundColor White
+        Write-Host "  vagrant up                          # resume (next day)"                   -ForegroundColor White
+        Write-Host "  vagrant destroy -f                  # tear down completely"                -ForegroundColor White
+    } else {
+        Write-Host "  cd $RepoRoot; vagrant ssh           # enter the VM"                         -ForegroundColor White
+        Write-Host "  claude mcp list                     # verify MCP user-scope entries"        -ForegroundColor White
+        Write-Host "  vagrant halt                        # stop the VM"                          -ForegroundColor White
+        Write-Host "  vagrant destroy -f                  # tear it down"                         -ForegroundColor White
+        Write-Host ""
+        Write-Host "Tip: re-run with -VMFirst for VS Code Remote-SSH setup + snapshot hints"     -ForegroundColor DarkGray
+    }
 }
 
 Write-Host ""
