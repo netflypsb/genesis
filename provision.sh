@@ -239,8 +239,10 @@ if [[ "$GENESIS_SKIP_SKILLS" != "1" ]]; then
       dst=$(expand_home "${dest:-$HOME/.claude/skills/$name}")
       if [[ -d "$src" && -f "$src/SKILL.md" ]]; then
         mkdir -p "$dst"
-        cp -r "$src"/. "$dst/"
-        step "skill: $name"
+        cp -r "$src"/. "$dst/" 2>&1 | head -3
+        # Sanity check: did anything actually land?
+        file_count=$(find "$dst" -mindepth 1 -maxdepth 3 -type f 2>/dev/null | wc -l)
+        step "skill: $name  (src=$src, dst=$dst, files=$file_count)"
         # Optional secondary install (e.g. OpenClaw workspace). Only if the
         # parent dir exists — don't create ~/.openclaw for users who skipped it.
         if [[ -n "$also" ]]; then
