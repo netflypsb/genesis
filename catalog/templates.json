@@ -1,5 +1,13 @@
 {
   "version": 1,
   "kind": "templates",
-  "items": []
+  "items": [
+    {
+      "name": "genesis-coder",
+      "source": "templates/genesis-coder.toml",
+      "install_to": "~/.clawteam/templates/genesis-coder.toml",
+      "default": true,
+      "tags": ["bundled", "coding"]
+    }
+  ]
 }

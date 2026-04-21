@@ -221,12 +221,24 @@ if [[ "$GENESIS_SKIP_SKILLS" != "1" ]]; then
       name=$(echo "$item"    | jq -r '.name')
       source=$(echo "$item"  | jq -r '.source')
       dest=$(echo "$item"    | jq -r '.install_to // ""')
+      also=$(echo "$item"    | jq -r '.also_install_to // ""')
       src="$GENESIS_HOME/$source"
       dst=$(expand_home "${dest:-$HOME/.claude/skills/$name}")
       if [[ -d "$src" && -f "$src/SKILL.md" ]]; then
         mkdir -p "$dst"
         cp -r "$src"/. "$dst/"
         step "skill: $name"
+        # Optional secondary install (e.g. OpenClaw workspace). Only if the
+        # parent dir exists — don't create ~/.openclaw for users who skipped it.
+        if [[ -n "$also" ]]; then
+          dst2=$(expand_home "$also")
+          parent=$(dirname "$(dirname "$dst2")")  # two levels up (.../skills/<name> -> ...)
+          if [[ -d "$parent" ]]; then
+            mkdir -p "$dst2"
+            cp -r "$src"/. "$dst2/"
+            step "  also -> $dst2"
+          fi
+        fi
       else
         warn "skill '$name' source missing: $src"
       fi
@@ -247,25 +259,50 @@ if [[ "$GENESIS_SKIP_SKILLS" != "1" ]]; then
   fi
 fi
 
-# ---------------------------------------------------- Phase 9: Claude Code env
-log "Phase 9 — Claude Code Ollama Cloud wiring"
+# ---------------------------------------------------- Phase 9: Claude Code env + permissions
+log "Phase 9 — Claude Code Ollama Cloud wiring + permissions"
 CLAUDE_DIR="$HOME/.claude"
 mkdir -p "$CLAUDE_DIR"
-# Write or update env vars in ~/.claude/settings.json (user-scope)
+# Write or update env vars + merge permissions.allow in ~/.claude/settings.json.
 # We only touch keys we own; don't clobber MCPs registered above.
+# The permissions block lets agent-driven `clawteam launch ...` (via the skill)
+# run without interactive approval prompts — critical for Path B to work.
 python3 - <<PY
 import json, os, pathlib
 p = pathlib.Path(os.path.expanduser("~/.claude/settings.json"))
 data = {}
 if p.exists():
-    try: data = json.loads(p.read_text())
+    try:    data = json.loads(p.read_text())
     except Exception: data = {}
+
+# --- env ---
 data.setdefault("env", {})
 data["env"].update({
     "ANTHROPIC_AUTH_TOKEN": "ollama",
     "ANTHROPIC_API_KEY":   "",
     "ANTHROPIC_BASE_URL":  "${GENESIS_OLLAMA_HOST}",
 })
+
+# --- permissions.allow (merge, preserve user additions) ---
+genesis_allow = [
+    "Read",
+    "Bash(clawteam *)",
+    "Bash(tmux *)",
+    "Bash(git status)",
+    "Bash(git diff *)",
+    "Bash(git log *)",
+    "Bash(git branch *)",
+    "Bash(ls *)",
+]
+perms = data.setdefault("permissions", {})
+existing = perms.get("allow", []) or []
+seen = set(existing)
+for entry in genesis_allow:
+    if entry not in seen:
+        existing.append(entry)
+        seen.add(entry)
+perms["allow"] = existing
+
 p.write_text(json.dumps(data, indent=2))
 print(f"wrote {p}")
 PY

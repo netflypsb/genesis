@@ -103,7 +103,7 @@ claude
 
 Claude reads `~/.claude/skills/clawteam/SKILL.md` and runs the CLI itself.
 
-> **Status:** Path A works today. Path B needs the `clawteam` skill, which arrives in Genesis `v0.2.2` — see [`phase2/`](phase2/) planning.
+> **Status:** Both paths work on the `phase2` branch (milestone 2.1, targeting `v0.2.2`). The skill installs to `~/.claude/skills/clawteam/` and Claude's `settings.json` pre-allows `Bash(clawteam *)` / `Bash(tmux *)` so the session doesn't stall on approval prompts. Bundled team templates today: `genesis-coder` (4-role coding team) plus ClawTeam's built-ins (`hedge-fund`, `code-review`, `research-paper`, `strategy-room`).
 
 ## What the wizard does
 

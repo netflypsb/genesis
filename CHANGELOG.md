@@ -4,6 +4,34 @@ All notable changes to Genesis.
 
 ## [Unreleased] — phase 2 in progress
 
+## [0.2.2] — Milestone 2.1: clawteam skill + genesis-coder template (phase2 branch)
+
+### Added
+- `skills/clawteam/SKILL.md` — vendored from upstream `win4r/ClawTeam-OpenClaw`.
+  Teaches Claude Code (lead agent) how to drive `clawteam launch`, manage
+  teams, spawn workers, monitor via kanban, and converge results.
+- `templates/genesis-coder.toml` — 4-role parallel coding team (planner leader
+  + builder + reviewer + scribe) with inline task prompts. Workers are
+  `openclaw` per upstream guidance (claude workers stall on permission prompts).
+- `catalog/skills.json` — adds `clawteam` skill entry. Supports
+  `also_install_to` field so the skill installs to both `~/.claude/skills/`
+  and (if present) `~/.openclaw/workspace/skills/`.
+- `catalog/templates.json` — populated with `genesis-coder` entry.
+- `provision.sh` Phase 9 now merges `permissions.allow` into
+  `~/.claude/settings.json` with: `Bash(clawteam *)`, `Bash(tmux *)`,
+  `Bash(git status|diff|log|branch *)`, `Bash(ls *)`, `Read`. Merge
+  semantics: preserves pre-existing user entries, no duplicates. This
+  unlocks **Path B** (agent-driven ClawTeam) — Claude no longer pauses for
+  approval when the skill invokes `clawteam` / `tmux`.
+- `scripts/test-permissions-merge.sh` — regression guard for the merge
+  logic. Asserts user entries survive, Genesis entries added, no dupes.
+- CI: `catalog-validate` job now runs the permissions-merge test too.
+
+### Changed
+- `provision.sh` Phase 8 (skills) honors an optional `also_install_to`
+  field on any skill item. If the secondary destination's parent already
+  exists (e.g. OpenClaw workspace), the skill is mirrored there.
+
 ## [0.2.1] — Milestone 2.0: catalog foundation (phase2 branch)
 
 ### Added

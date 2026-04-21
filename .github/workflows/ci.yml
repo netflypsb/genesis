@@ -46,6 +46,8 @@ jobs:
         run: bash scripts/validate-catalog.sh
       - name: Catalog reader smoke test
         run: bash scripts/test-catalog-reader.sh
+      - name: Permissions merge smoke test
+        run: bash scripts/test-permissions-merge.sh
 
   provision-syntax:
     name: provision.sh shellcheck

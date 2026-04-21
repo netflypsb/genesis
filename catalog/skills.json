@@ -43,6 +43,14 @@
       "install_to": "~/.claude/skills/advertisement",
       "default": true,
       "tags": ["marketing", "bundled"]
+    },
+    {
+      "name": "clawteam",
+      "source": "skills/clawteam",
+      "install_to": "~/.claude/skills/clawteam",
+      "also_install_to": "~/.openclaw/workspace/skills/clawteam",
+      "default": true,
+      "tags": ["orchestration", "bundled", "agent-driven"]
     }
   ]
 }
