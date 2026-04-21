@@ -92,21 +92,46 @@ if (-not (Test-Path $mainCfg)) {
     }
 }
 
-# 5. Check / install VS Code Remote-SSH extension.
+# 5. Locate the VS Code CLI (PATH first, then common install locations).
 $codeCmd = Get-Command code -ErrorAction SilentlyContinue
 if (-not $codeCmd) {
-    Write-Err "VS Code 'code' CLI not on PATH. Install VS Code and enable 'Add to PATH' in the installer."
-    Write-Warn "Or open VS Code manually and run the command:  Remote-SSH: Connect to Host -> $VMHostAlias"
-    exit 1
+    $candidates = @(
+        "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd",
+        "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code",
+        "$env:ProgramFiles\Microsoft VS Code\bin\code.cmd",
+        "${env:ProgramFiles(x86)}\Microsoft VS Code\bin\code.cmd"
+    )
+    foreach ($p in $candidates) {
+        if (Test-Path $p) {
+            $codePath = $p
+            Write-Ok "found VS Code at $p"
+            break
+        }
+    }
+    if (-not $codePath) {
+        Write-Err "VS Code not found on PATH or at standard install locations."
+        Write-Warn "Install from https://code.visualstudio.com/download (tick 'Add to PATH')"
+        Write-Warn "Or open VS Code manually: F1 -> 'Remote-SSH: Connect to Host' -> $VMHostAlias"
+        exit 1
+    }
+} else {
+    $codePath = $codeCmd.Source
 }
-$extList = & code --list-extensions 2>$null
+# Call shim: cmd files need cmd /c on older PowerShell.
+function Invoke-Code {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$CodeArgs)
+    if ($codePath -like "*.cmd") { & cmd /c $codePath @CodeArgs }
+    else                         { & $codePath @CodeArgs }
+}
+
+$extList = Invoke-Code --list-extensions 2>$null
 if ($extList -notcontains "ms-vscode-remote.remote-ssh") {
     Write-Step "Installing Remote-SSH extension..."
-    & code --install-extension ms-vscode-remote.remote-ssh --force | Out-Null
+    Invoke-Code --install-extension ms-vscode-remote.remote-ssh --force | Out-Null
 }
 Write-Ok "Remote-SSH extension present"
 
 # 6. Launch VS Code on the VM path.
 $uri = "vscode-remote://ssh-remote+$VMHostAlias$ProjectPath"
 Write-Ok "Opening $uri"
-& code --folder-uri $uri
+Invoke-Code --folder-uri $uri
