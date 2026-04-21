@@ -8,44 +8,62 @@
 
 Three agent frameworks + a code-writing CLI + MCP + skills have a dozen moving parts. Genesis:
 
-1. **Isolates them** in a Linux sandbox (WSL2 by default, Vagrant VM as fallback) so a rogue bash tool can't touch your Windows host.
-2. **Installs MCP servers at user scope** via `claude mcp add --scope user` so they appear in every project — no more per-project `.mcp.json` drift. See [docs/research.md §1](docs/research.md).
+1. **Isolates them** in a Linux sandbox (WSL2 or Vagrant VM) so a rogue bash tool can't touch your Windows host.
+2. **Installs MCP servers at user scope** via `claude mcp add --scope user` so they appear in every project — no more per-project `.mcp.json` drift.
 3. **Configures Ollama Cloud without an API key** by leaning on `ollama signin` + `ANTHROPIC_AUTH_TOKEN=ollama`.
-4. **Bundles Claude Code skills** (`docx`, `pdf`, `xlsx`, `pptx`, `frontend-design`, `advertisement`) and drops them into `~/.claude/skills/` — globally discoverable.
-5. **Uses the right ClawTeam** (`win4r/ClawTeam-OpenClaw` + `pipx install --editable`). The PyPI `clawteam` is a different package, and `npm i -g clawteam` is a name-squatter.
+4. **Bundles Claude Code skills** (`docx`, `pdf`, `xlsx`, `pptx`, `frontend-design`, `advertisement`, `clawteam`) — globally discoverable.
+5. **Uses the right ClawTeam** (`win4r/ClawTeam-OpenClaw` + `pipx install --editable`).
 
-## Quick start
+## Which backend should I pick?
 
-Three distinct commands — use the right one for the job.
+| | **WSL** (default) | **VM-first** (recommended for heavy use) |
+|---|---|---|
+| Boot time | seconds | ~60s first time, 20s after |
+| Isolation | process-level, shared kernel with Windows | hardware-level (VirtualBox) |
+| Host FS access | `/mnt/c/...` visible | none unless you opt-in with `-SyncProjects` |
+| RAM cost | demand-paged | 8 GB reserved |
+| Best for | quick start, light editing, Windows/Linux interop | multi-agent swarms, daemons, risky runs, snapshot/rewind |
+| Requires | Win 10 build 19041+ | VirtualBox + Vagrant |
 
-### 1. First install — run once per machine
+**Unsure?** Start with WSL. You can run `-VMFirst` later without touching the WSL install.
+
+---
+
+## WSL backend
+
+### 🚀 First-time install
+
+From **any** PowerShell window, **any** directory:
 
 ```powershell
 iwr https://raw.githubusercontent.com/netflypsb/genesis/main/setup/bootstrap.ps1 | iex
 ```
 
-From **any** PowerShell window, **any** directory. The bootstrap clones the repo to `%USERPROFILE%\genesis` and launches the wizard. Expect ~15–20 min the first time (Ubuntu download, apt packages, npm globals, Playwright Chromium).
+This clones the repo to `%USERPROFILE%\genesis` and runs the wizard. Expect **~15–20 min** (Ubuntu download, apt packages, npm globals, Playwright Chromium).
 
-### 2. Daily use — run every coding session
+When it finishes you'll have `claude`, `openclaw`, `clawteam`, 7 skills, 4 agents, 1 template, and 5 MCPs all wired up inside WSL's Ubuntu.
+
+### 📅 Daily use
 
 ```powershell
-wsl -d Ubuntu                    # drop into the Linux sandbox
+wsl -d Ubuntu
 ```
 
 Then inside WSL:
 
 ```bash
-cd ~/projects/your-project       # or /mnt/c/Users/you/your-project (slower)
-claude                           # Claude Code, pre-wired with MCPs + skills + Ollama
-# or
-clawteam launch code-review --goal "..." --workspace --repo .
+cd ~/projects/my-app                    # fast (native ext4)
+# OR for a Windows-side project:
+cd /mnt/c/Users/you/code/my-app         # ~10× slower, but shared with Windows apps
+
+claude                                  # Claude Code, pre-wired with MCPs + skills
 ```
 
-Or in VS Code: install the **WSL extension** → "Reopen in WSL" → terminal gives you `claude` directly.
+You **do not re-run the wizard** for daily coding. Just `wsl -d Ubuntu`.
 
-**You never re-run the wizard for daily work.** It's only for install, upgrade, or recovery.
+Prefer VS Code? Install the **Remote - WSL** extension → "Reopen folder in WSL" → terminal in that window gives you `claude` directly.
 
-### 3. Upgrade / re-run the wizard — run rarely
+### 🔄 Updating Genesis (new skills / MCPs / fixes)
 
 ```powershell
 cd $env:USERPROFILE\genesis
@@ -53,172 +71,306 @@ git pull
 .\setup\setup-genesis.ps1
 ```
 
-**Run from `$env:USERPROFILE\genesis`, not your project folder.** The wizard needs `provision.sh`, `Vagrantfile`, `mcp/`, `skills/`, `agents/` sitting next to it. Trigger this only when:
+The wizard is idempotent — re-runs are fast because it skips already-installed pieces. Only re-run when:
 
 - a new Genesis release adds MCPs / skills / teams you want,
-- you're switching backends (WSL ↔ Vagrant VM),
-- you need to recover a broken install (wizard is idempotent).
+- you're switching backends (WSL ↔ VM),
+- you need to recover a broken install.
 
-### Wizard options
+### 📝 WSL backend — all-in-one cheat sheet
 
 ```powershell
-.\setup\setup-genesis.ps1                       # WSL2 backend (default)
-.\setup\setup-genesis.ps1 -VMFirst              # VM-first workflow (recommended for isolation + perf)
-.\setup\setup-genesis.ps1 -Mode vm              # VM backend, basic
-.\setup\setup-genesis.ps1 -Distro Ubuntu-22.04  # pick a specific WSL distro
-.\setup\setup-genesis.ps1 -SkipOpenClaw         # Claude Code + MCPs only
-.\setup\setup-genesis.ps1 -Enable vibe-trading  # opt-in catalog items
-.\setup\setup-genesis.ps1 -Disable playwright   # drop defaults
-.\setup\setup-genesis.ps1 -AutoSignin           # auto-run `ollama signin`
+# First time (any directory)
+iwr https://raw.githubusercontent.com/netflypsb/genesis/main/setup/bootstrap.ps1 | iex
+
+# Every day
+wsl -d Ubuntu
+
+# Update (once in a while)
+cd $env:USERPROFILE\genesis; git pull; .\setup\setup-genesis.ps1
 ```
 
-## Three backends, one wizard
+---
 
-| Backend | Command | Best for |
-|---|---|---|
-| **WSL** (default) | `setup-genesis.ps1` | Fast start, shared FS with Windows, no VM overhead |
-| **VM** (basic) | `setup-genesis.ps1 -Mode vm` | Stronger isolation than WSL |
-| **VM-first** | `setup-genesis.ps1 -VMFirst` | **Recommended** for multi-agent / daemon use. Native ext4 perf, hard host boundary, VS Code Remote-SSH auto-configured, snapshot workflow ready. See [`phase2/06-vm-first-workflow.md`](phase2/06-vm-first-workflow.md). |
+## VM-first backend
 
-## Two Claude Codes? Use the WSL one.
+Full isolation, native ext4 performance, snapshot/restore, VS Code Remote-SSH auto-wired.
 
-You may have an older Claude Code install on Windows (`C:\Users\you\.claude\`). That's a **completely separate** process from the Claude Code that Genesis installs inside WSL (`/home/you/.claude/`). They don't share MCPs, skills, or settings. **For Genesis, always use the WSL one** — just run `claude` after `wsl -d Ubuntu`.
+### 🚀 First-time install
 
-## Where your projects live
+**Prerequisites:** install **VirtualBox** and **Vagrant** once.
 
-| Setup | Path inside sandbox | Speed | Host access |
-|---|---|---|---|
-| **VM-first** (recommended) | `/home/vagrant/projects/my-app` | **fast** (native ext4) | VS Code Remote-SSH via `.\scripts\open-vm-in-vscode.ps1`. No direct NTFS access unless you opt-in with `-SyncProjects`. |
-| **WSL, ext4** | `/home/you/projects/my-app` | **fast** (native ext4) | `\\wsl$\Ubuntu\home\you\projects\...` |
-| **WSL, Windows NTFS** | `/mnt/c/Users/you/code/my-app` | ~10× slower for small-file workloads | native |
+```powershell
+# Check if already installed
+VBoxManage --version; vagrant --version
+```
 
-For heavy agent work (many file writes, git ops, node_modules, pytest), use one of the **fast** rows. WSL-on-`/mnt/c` is fine for light editing but not for swarms.
+If missing: [VirtualBox](https://www.virtualbox.org/wiki/Downloads) + [Vagrant](https://developer.hashicorp.com/vagrant/downloads) — both have standard Windows installers. Reboot after to finalize drivers.
 
-### VM-first daily flow
+Then:
+
+```powershell
+cd $env:USERPROFILE                                # or anywhere
+iwr https://raw.githubusercontent.com/netflypsb/genesis/main/setup/bootstrap.ps1 -OutFile bootstrap.ps1
+# Edit the file OR use the cloned repo directly:
+cd $env:USERPROFILE\genesis                        # after first clone
+.\setup\setup-genesis.ps1 -VMFirst
+```
+
+Or in one go if you've never cloned:
+
+```powershell
+iwr https://raw.githubusercontent.com/netflypsb/genesis/main/setup/bootstrap.ps1 | iex
+# Then after the clone happens:
+cd $env:USERPROFILE\genesis
+.\setup\setup-genesis.ps1 -VMFirst
+```
+
+Expect **~25–35 min** first time (Ubuntu 24.04 box download ~1 GB + provisioning).
+
+The wizard will:
+1. Detect + install Ollama / VirtualBox / Vagrant if missing (winget or direct download).
+2. `vagrant up` — boots the Ubuntu 24.04 VM.
+3. Runs provisioning inside the VM (same as WSL).
+4. Exports SSH config to `~/.ssh/config.d/genesis` with alias `genesis-vm`.
+5. Writes `~/.genesis/vm-config.json` for helper scripts.
+
+### 📅 Daily use
 
 ```powershell
 cd $env:USERPROFILE\genesis
-vagrant up                                      # 30-60s if halted
-.\scripts\open-vm-in-vscode.ps1                 # VS Code connects via Remote-SSH
-# OR
-vagrant ssh                                     # plain terminal
-# then inside: cd ~/projects/my-app && claude
+vagrant up                                        # ~20s to resume if halted
+
+# Option A: plain terminal
+vagrant ssh
+# Inside VM:
+cd ~/projects/my-app && claude
+
+# Option B: VS Code Remote-SSH (recommended)
+.\scripts\open-vm-in-vscode.ps1                   # opens ~/projects in VS Code
+# OR a specific path:
+.\scripts\open-vm-in-vscode.ps1 /home/vagrant/projects/my-app
 ```
 
-Snapshots before risky agent runs:
+End of day:
 
 ```powershell
+vagrant halt                                      # preserves VM state
+```
+
+### 🔄 Updating Genesis
+
+```powershell
+cd $env:USERPROFILE\genesis
+git pull
+vagrant provision                                 # re-runs installer inside the VM (fast)
+```
+
+Or re-run the full wizard if you want the ssh config refreshed too:
+
+```powershell
+.\setup\setup-genesis.ps1 -VMFirst
+```
+
+### 📸 Snapshots — rewind before risky agent runs
+
+```powershell
+cd $env:USERPROFILE\genesis
 vagrant snapshot save pre-agent-run
-# ...run the risky thing...
-vagrant snapshot restore pre-agent-run          # rewinds in ~1 min
+# ... run something risky (agent does `rm -rf /`, etc.) ...
+vagrant snapshot restore pre-agent-run            # back to safety in ~1 min
+
+vagrant snapshot list
+vagrant snapshot delete pre-agent-run             # when you don't need it anymore
 ```
 
 Full snapshot workflow: [`docs/vm-snapshots.md`](docs/vm-snapshots.md).
 
-## Launching ClawTeam — two paths
+### 📝 VM-first backend — all-in-one cheat sheet
 
-### Path A: you drive it (CLI)
+```powershell
+# First time
+cd $env:USERPROFILE\genesis                       # or bootstrap first
+.\setup\setup-genesis.ps1 -VMFirst
 
-```bash
-wsl -d Ubuntu
-cd ~/projects/my-repo
-clawteam launch code-review --goal "Review for bugs + perf" --workspace --repo .
+# Every day
+cd $env:USERPROFILE\genesis; vagrant up; .\scripts\open-vm-in-vscode.ps1
+
+# Stop for the day
+cd $env:USERPROFILE\genesis; vagrant halt
+
+# Update
+cd $env:USERPROFILE\genesis; git pull; vagrant provision
+
+# Snapshot / restore
+cd $env:USERPROFILE\genesis; vagrant snapshot save <name>
+cd $env:USERPROFILE\genesis; vagrant snapshot restore <name>
+
+# Nuke and start over
+cd $env:USERPROFILE\genesis; vagrant destroy -f
 ```
 
-### Path B: an agent drives it (needs the `clawteam` skill)
+### VS Code Remote-SSH setup
+
+If `.\scripts\open-vm-in-vscode.ps1` reports **`code` CLI not found**:
+
+1. Open VS Code (Start menu).
+2. <kbd>F1</kbd> → type **`Shell Command: Install 'code' command in PATH`** → Enter.
+3. Close PowerShell, reopen.
+4. `.\scripts\open-vm-in-vscode.ps1` now works.
+
+Or manually: open VS Code → <kbd>F1</kbd> → `Remote-SSH: Connect to Host…` → pick `genesis-vm`.
+
+---
+
+## Using Claude Code + ClawTeam
+
+Works identically in both WSL and VM backends. All commands below run **inside the sandbox** (`wsl -d Ubuntu` or `vagrant ssh`).
+
+### Single Claude session
 
 ```bash
-wsl -d Ubuntu
+cd ~/projects/my-app
 claude
-# In Claude: "Use clawteam to spin up a code-review team on this repo."
 ```
 
-Claude reads `~/.claude/skills/clawteam/SKILL.md` and runs the CLI itself.
+Claude has access to:
+- **7 skills** — docx, pdf, xlsx, pptx, frontend-design, advertisement, clawteam
+- **5 MCPs** — fetch, git, playwright (3 Genesis-installed) + 2 Claude-defaults
+- **4 agents** — planner, builder, reviewer, scribe (used by clawteam templates)
+- **1 template** — `genesis-coder` (4-role parallel coding team)
 
-> **Status:** Both paths work on the `phase2` branch (milestone 2.1, targeting `v0.2.2`). The skill installs to `~/.claude/skills/clawteam/` and Claude's `settings.json` pre-allows `Bash(clawteam *)` / `Bash(tmux *)` so the session doesn't stall on approval prompts. Bundled team templates today: `genesis-coder` (4-role coding team) plus ClawTeam's built-ins (`hedge-fund`, `code-review`, `research-paper`, `strategy-room`).
+### ClawTeam — agent swarms in tmux panes
 
-## What the wizard does
+**You drive it (CLI):**
 
-| Phase | Action |
-|-------|--------|
-| 0 | Host capability check (OS build, RAM, CPU, PS version) |
-| 1 | Ollama Desktop on Windows host (winget install + `ollama signin` if needed) |
-| 2 | Backend setup: WSL2 distro (default `Ubuntu` — latest LTS) **or** Vagrant VM (8 GB / 4 CPU) |
-| 3 | Runs **`provision.sh`** inside the sandbox — one script, two transports |
+```bash
+cd ~/projects/my-app
+clawteam template list                                    # see available teams
 
-`provision.sh` then, inside the Linux sandbox:
+clawteam launch genesis-coder \
+    --goal "Build a Python CLI that prints the first 10 primes, with pytest tests" \
+    --workspace --repo .
+```
 
-1. Installs base packages (`python3.10+`, `git`, `tmux`, `curl`, `build-essential`, `jq`).
-2. Installs **Node.js 22** via NodeSource.
-3. Installs **`uv`** (Astral) for fast Python tool execution.
-4. Installs **Claude Code** (`claude.ai/install.sh`).
-5. Installs **OpenClaw** (`npm i -g openclaw`) and **ClawTeam-OpenClaw** (`git clone` + `pipx install --editable`, so it respects PEP 668 on Ubuntu 24.04).
-6. Installs **Playwright Chromium** (eager; ~300 MB).
-7. Registers three MCP servers at **user-scope**: `fetch`, `git`, `playwright` — visible in every project via `claude mcp list`.
-8. Copies bundled skills → `~/.claude/skills/`.
-9. Writes Ollama Cloud env into `~/.claude/settings.json`.
-10. Copies agent role prompts → `~/.claude/agents/`.
+This opens a **tmux session** with 4 Claude panes (planner leader + builder + reviewer + scribe) coordinating via ClawTeam's kanban board.
 
-## Backends at a glance
+Attach/detach with tmux:
+- Attach: `tmux attach -t clawteam`
+- Detach: <kbd>Ctrl+b</kbd> then <kbd>d</kbd>
+- See kanban: `clawteam board serve` (opens http://localhost:8080)
 
-| | **WSL2** (default) | **Vagrant VM** |
-|---|---|---|
-| Boot time | seconds | minutes |
-| Isolation | process + separate FS | hardware-level |
-| Host access | `/mnt/c/*` visible | only via `synced_folder` |
-| RAM cost | demand-paged | 8 GB fixed |
-| Requires | Win 10 build 19041+ | VirtualBox + Vagrant |
-| Hyper-V conflict | — | degrades perf; consider disabling |
+**Agent drives it (hands-free):**
 
-See [docs/research.md §4](docs/research.md) for the full tradeoff.
+```bash
+claude
+```
+
+Then in Claude:
+
+> "Use clawteam to spin up a `genesis-coder` team on this repo. Goal: build a Python CLI that prints the first 10 primes with pytest tests."
+
+Claude reads `~/.claude/skills/clawteam/SKILL.md` and runs the CLI itself. Because `Bash(clawteam *)` + `Bash(tmux *)` are pre-allowed in `~/.claude/settings.json`, it proceeds without stalling on permission prompts.
+
+### Built-in team templates
+
+| Template | Source | Roles | Use case |
+|---|---|---|---|
+| `genesis-coder` | Genesis | planner, builder, reviewer, scribe | General-purpose coding |
+| `code-review` | ClawTeam upstream | lead + reviewers | Review a PR / codebase |
+| `hedge-fund` | ClawTeam upstream | varied | Financial research (demo) |
+| `research-paper` | ClawTeam upstream | varied | Literature review |
+| `strategy-room` | ClawTeam upstream | varied | Strategic analysis |
+
+See all: `clawteam template list`.
+
+### Writing your own template
+
+Drop a `.toml` file into `~/.clawteam/templates/`. Mirror `~/.clawteam/templates/genesis-coder.toml` as a starting point.
+
+---
+
+## Wizard options
+
+```powershell
+.\setup\setup-genesis.ps1                         # WSL2 backend (default)
+.\setup\setup-genesis.ps1 -VMFirst                # VM-first workflow
+.\setup\setup-genesis.ps1 -Mode vm                # VM backend, basic (no ssh export)
+.\setup\setup-genesis.ps1 -Distro Ubuntu-22.04    # pick a specific WSL distro
+.\setup\setup-genesis.ps1 -SyncProjects C:\work   # (VM) mount Windows dir into VM
+.\setup\setup-genesis.ps1 -SkipOpenClaw           # Claude Code + MCPs only
+.\setup\setup-genesis.ps1 -Enable vibe-trading    # opt-in catalog items
+.\setup\setup-genesis.ps1 -Disable playwright     # drop defaults
+.\setup\setup-genesis.ps1 -AutoSignin             # auto-run `ollama signin`
+```
+
+## Where your projects live
+
+| Backend | Path inside sandbox | Speed | Notes |
+|---|---|---|---|
+| **VM-first** | `/home/vagrant/projects/my-app` | native ext4 (fast) | VS Code via Remote-SSH |
+| **WSL, ext4** | `/home/you/projects/my-app` | native ext4 (fast) | Windows access: `\\wsl$\Ubuntu\home\you\projects\...` |
+| **WSL on NTFS** | `/mnt/c/Users/you/code/my-app` | ~10× slower small-file | Native Windows access |
+
+For agent swarms, prefer the first two. `/mnt/c` is fine for light editing.
+
+## Verification
+
+Inside the sandbox:
+
+```bash
+claude --version
+claude mcp list                             # should show 5 MCPs
+ls ~/.claude/skills                         # 7 skills
+ls ~/.claude/agents                         # 4 agents
+ls ~/.clawteam/templates                    # 1 template (genesis-coder)
+
+# Ollama reachability (VM uses 10.0.2.2, WSL uses host.docker.internal)
+curl http://$(grep -oP 'OLLAMA_HOST[^"]+"\K[^"]+' ~/.claude/settings.json | head -1)/api/tags
+```
+
+On the Windows host:
+
+```powershell
+ollama whoami                                # confirm signed in
+ollama run gpt-oss:120b-cloud "hi"           # smoke-test the cloud model
+```
 
 ## Repo layout
 
 ```
 genesis/
-├─ setup/                  # PowerShell wizard + shared libs
-│  ├─ setup-genesis.ps1    # main wizard (v0.2.0)
-│  ├─ bootstrap.ps1        # one-liner entry point
-│  └─ lib/                 # common.ps1, wsl.ps1, mcp.ps1
-├─ provision.sh            # shared Linux installer (WSL + VM)
-├─ Vagrantfile             # VM fallback config
-├─ mcp/                    # MCP registry + vendored sources (flattened)
-├─ agents/                 # planner/builder/reviewer/scribe prompts
-├─ skills/                 # Claude Code skills (docx, pdf, xlsx, ...)
-├─ config/                 # sample settings.json
-├─ docs/                   # research, WSL notes, troubleshooting
-└─ .github/workflows/      # CI
+├─ setup/                   # PowerShell wizard
+│  ├─ setup-genesis.ps1     # main wizard
+│  ├─ bootstrap.ps1         # one-liner entry point
+│  └─ lib/                  # common.ps1, wsl.ps1, mcp.ps1
+├─ provision.sh             # shared Linux installer (WSL + VM)
+├─ Vagrantfile              # VM config (Ubuntu 24.04)
+├─ catalog/                 # skills.json, mcps.json, agents.json, templates.json
+├─ skills/                  # Claude Code skills (bundled sources)
+├─ agents/                  # planner, builder, reviewer, scribe prompts
+├─ templates/               # ClawTeam team TOMLs (genesis-coder)
+├─ mcp/                     # MCP registry + vendored sources
+├─ scripts/                 # helpers (open-vm-in-vscode.ps1, validators)
+├─ docs/                    # vm-snapshots, research, troubleshooting
+├─ phase2/                  # planning notes for phase 2 development
+└─ .github/workflows/       # CI
 ```
-
-## Verification
-
-**Inside the WSL sandbox** (`wsl -d Ubuntu`):
-
-```bash
-claude --version
-claude mcp list              # should show fetch, git, playwright at user-scope
-openclaw --version           # if you didn't pass -SkipOpenClaw
-clawteam --version
-ls ~/.claude/skills          # bundled skills
-curl http://host.docker.internal:11434/api/tags   # WSL can reach Windows Ollama
-```
-
-**On the Windows host** (PowerShell, not WSL — Ollama runs here only):
-
-```powershell
-ollama run gpt-oss:120b-cloud "hi"   # smoke-test the cloud model
-ollama whoami                         # confirm signed in
-```
-
-> Ollama is a **Windows-side daemon**. Do not `sudo snap install ollama` inside WSL — the sandbox reaches the host's Ollama at `http://host.docker.internal:11434` and that's all Claude Code needs.
 
 ## Troubleshooting
 
-- **`bash: command not found: claude` inside WSL** — reload your shell: `exec bash -l`, or `source ~/.bashrc`.
-- **`ollama signin` opens a URL the WSL terminal can't click** — copy/paste it into your Windows browser. The signin persists on the host.
-- **`claude mcp list` is empty** — your Claude Code CLI may predate `--scope` support. Update: `claude upgrade`, then re-run the wizard.
-- **VM `vagrant up` hangs with Hyper-V enabled** — disable Hyper-V or switch to `--provider=hyperv`. See [docs/research.md §4](docs/research.md).
-- More in [docs/troubleshooting.md](docs/troubleshooting.md).
+| Symptom | Fix |
+|---|---|
+| `bash: claude: command not found` inside WSL | `exec bash -l` to reload, or `source ~/.bashrc` |
+| `ollama signin` opens a URL in the Linux terminal | Copy-paste it into your Windows browser — signin persists on the host |
+| `claude mcp list` is empty | `claude upgrade` then re-run the wizard |
+| VM `vagrant up` slow with Hyper-V enabled | VirtualBox uses paravirt mode — works but slower. To disable Hyper-V: `bcdedit /set hypervisorlaunchtype off` (admin + reboot) |
+| VM `chmod: Read-only file system` | Fixed in `v0.2.4+`. `git pull` and `vagrant provision` again |
+| Skills/agents summary shows `0` but Phase 8/10 logged installs | Fixed in `v0.2.4+`. `git pull` and `vagrant provision` again |
+| `VBoxManage not recognized` after install | Close & reopen PowerShell — wizard's PATH self-healer runs on next invocation |
+| `code` CLI missing for `open-vm-in-vscode.ps1` | In VS Code: <kbd>F1</kbd> → `Shell Command: Install 'code' command in PATH` |
+
+More: [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ## License
 
