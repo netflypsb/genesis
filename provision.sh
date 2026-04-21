@@ -150,7 +150,12 @@ if [[ "$GENESIS_SKIP_OPENCLAW" != "1" ]]; then
   fi
 
   log "Phase 5b — Genesis repo clone"
-  if [[ ! -d "$GENESIS_HOME/.git" ]]; then
+  if [[ "$GENESIS_VM_MODE" == "1" ]]; then
+    # VM mode: /vagrant is the host's checkout (read-only mount). Source
+    # of truth lives on Windows; users update via `git pull` there, then
+    # `vagrant provision` to re-run. Nothing to do here.
+    step "VM mode: /vagrant already mirrors the host checkout — skipping"
+  elif [[ ! -d "$GENESIS_HOME/.git" ]]; then
     git clone --depth 1 --branch "$GENESIS_REPO_REF" "$GENESIS_REPO_URL" "$GENESIS_HOME"
   else
     git -C "$GENESIS_HOME" fetch --depth 1 origin "$GENESIS_REPO_REF"
