@@ -16,15 +16,36 @@ Three agent frameworks + a code-writing CLI + MCP + skills have a dozen moving p
 
 ## Quick start
 
-### First run (from any PowerShell window, anywhere)
+Three distinct commands — use the right one for the job.
+
+### 1. First install — run once per machine
 
 ```powershell
 iwr https://raw.githubusercontent.com/netflypsb/genesis/main/setup/bootstrap.ps1 | iex
 ```
 
-This clones the repo to `%USERPROFILE%\genesis` and launches the wizard. **You do not need to `cd` into any particular folder first** — the bootstrap works from `C:\`, `C:\Users\you`, inside another project, anywhere.
+From **any** PowerShell window, **any** directory. The bootstrap clones the repo to `%USERPROFILE%\genesis` and launches the wizard. Expect ~15–20 min the first time (Ubuntu download, apt packages, npm globals, Playwright Chromium).
 
-### Subsequent runs (new session, rerun, upgrade)
+### 2. Daily use — run every coding session
+
+```powershell
+wsl -d Ubuntu                    # drop into the Linux sandbox
+```
+
+Then inside WSL:
+
+```bash
+cd ~/projects/your-project       # or /mnt/c/Users/you/your-project (slower)
+claude                           # Claude Code, pre-wired with MCPs + skills + Ollama
+# or
+clawteam launch code-review --goal "..." --workspace --repo .
+```
+
+Or in VS Code: install the **WSL extension** → "Reopen in WSL" → terminal gives you `claude` directly.
+
+**You never re-run the wizard for daily work.** It's only for install, upgrade, or recovery.
+
+### 3. Upgrade / re-run the wizard — run rarely
 
 ```powershell
 cd $env:USERPROFILE\genesis
@@ -32,35 +53,57 @@ git pull
 .\setup\setup-genesis.ps1
 ```
 
-**Run it from `$env:USERPROFILE\genesis`, not from your project folder.** The wizard needs `provision.sh`, `Vagrantfile`, `mcp/`, `skills/`, and `agents/` sitting next to it — they all live in that folder.
+**Run from `$env:USERPROFILE\genesis`, not your project folder.** The wizard needs `provision.sh`, `Vagrantfile`, `mcp/`, `skills/`, `agents/` sitting next to it. Trigger this only when:
 
-### Options
+- a new Genesis release adds MCPs / skills / teams you want,
+- you're switching backends (WSL ↔ Vagrant VM),
+- you need to recover a broken install (wizard is idempotent).
+
+### Wizard options
 
 ```powershell
 .\setup\setup-genesis.ps1                     # WSL2 backend (default)
-.\setup\setup-genesis.ps1 -Mode vm            # Vagrant + VirtualBox
+.\setup\setup-genesis.ps1 -Mode vm            # Vagrant + VirtualBox fallback
 .\setup\setup-genesis.ps1 -Distro Ubuntu-22.04  # pick a specific distro
 .\setup\setup-genesis.ps1 -SkipOpenClaw       # Claude Code + MCPs only
 .\setup\setup-genesis.ps1 -SkipSkills -SkipMcps  # minimal
-.\setup\setup-genesis.ps1 -AutoSignin         # run 'ollama signin' without prompting
+.\setup\setup-genesis.ps1 -AutoSignin         # auto-run `ollama signin`
 ```
 
-### Day-to-day (after setup is done, once)
+## Two Claude Codes? Use the WSL one.
 
-You **never re-run the wizard** for normal work. Open your project in a WSL terminal:
+You may have an older Claude Code install on Windows (`C:\Users\you\.claude\`). That's a **completely separate** process from the Claude Code that Genesis installs inside WSL (`/home/you/.claude/`). They don't share MCPs, skills, or settings. **For Genesis, always use the WSL one** — just run `claude` after `wsl -d Ubuntu`.
 
-```powershell
-wsl -d Ubuntu                    # drop into the sandbox
-cd /mnt/c/path/to/your/project   # or ~/somewhere
-claude                           # Claude Code inherits the global MCPs + skills
+## Your projects — inside or outside WSL?
+
+| Location | Path from WSL | Speed | Accessible from Windows? |
+|---|---|---|---|
+| `~/projects/my-app` (inside WSL ext4) | `/home/you/projects/my-app` | **fast** | yes, via `\\wsl$\Ubuntu\home\you\projects\...` |
+| `C:\Users\you\code\my-app` (Windows NTFS) | `/mnt/c/Users/you/code/my-app` | ~10× slower for many small files | natively |
+
+For heavy agent work (lots of file writes), clone to `~/projects/`. For projects you edit from both Windows apps and WSL, put them under `C:\Users\you\...` and accept the I/O cost.
+
+## Launching ClawTeam — two paths
+
+### Path A: you drive it (CLI)
+
+```bash
+wsl -d Ubuntu
+cd ~/projects/my-repo
+clawteam launch code-review --goal "Review for bugs + perf" --workspace --repo .
 ```
 
-Or open the project folder in VS Code with the **WSL extension** — same thing.
+### Path B: an agent drives it (needs the `clawteam` skill)
 
-Rerun the wizard only when:
-- **upgrading Genesis** (`git pull` + rerun picks up new MCPs / skills / agents).
-- **adding a new backend** (e.g., you initially installed WSL, now want the VM too).
-- **recovering** from a broken install (the wizard is idempotent — safe to rerun).
+```bash
+wsl -d Ubuntu
+claude
+# In Claude: "Use clawteam to spin up a code-review team on this repo."
+```
+
+Claude reads `~/.claude/skills/clawteam/SKILL.md` and runs the CLI itself.
+
+> **Status:** Path A works today. Path B needs the `clawteam` skill, which arrives in Genesis `v0.2.2` — see [`phase2/`](phase2/) planning.
 
 ## What the wizard does
 
