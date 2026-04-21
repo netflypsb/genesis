@@ -213,10 +213,49 @@ if [[ "$GENESIS_SKIP_MCPS" != "1" ]]; then
       name=$(echo "$item"   | jq -r '.name')
       scope=$(echo "$item"  | jq -r '.scope // "user"')
       cmd=$(echo "$item"    | jq -r '.command')
-      # jq outputs args as whitespace-separated; safe because our args are all
-      # simple tokens (no spaces in any registered arg today).
       args=$(echo "$item"   | jq -r '.args | join(" ")')
-      # claude mcp add is idempotent-ish; ignore "already exists" on re-run.
+      inst_kind=$(echo "$item" | jq -r '.install.kind // ""')
+
+      # Optional install step for opt-in MCPs that aren't just uvx/npx runners.
+      case "$inst_kind" in
+        pipx)
+          pkg=$(echo "$item" | jq -r '.install.package')
+          if ! command -v "$cmd" >/dev/null 2>&1; then
+            step "MCP: $name - installing $pkg via pipx..."
+            pipx install "$pkg" >/dev/null || warn "pipx install $pkg failed; skipping $name"
+          fi
+          ;;
+        git-node)
+          repo=$(echo "$item"   | jq -r '.install.repo')
+          path=$(expand_home "$(echo "$item" | jq -r '.install.path')")
+          subdir=$(echo "$item" | jq -r '.install.subdir // ""')
+          build=$(echo "$item"  | jq -r '.install.build // false')
+          if [[ ! -d "$path" ]]; then
+            step "MCP: $name - cloning $repo -> $path"
+            git clone --depth 1 "$repo" "$path" 2>/dev/null || warn "git clone failed for $name"
+          fi
+          if [[ -d "$path" && "$build" == "true" ]]; then
+            target="$path"
+            [[ -n "$subdir" && -d "$path/$subdir" ]] && target="$path/$subdir"
+            if [[ -f "$target/package.json" && ! -d "$target/node_modules" ]]; then
+              step "MCP: $name - npm install + build in $target"
+              (cd "$target" && npm install --silent 2>/dev/null && npm run build --silent 2>/dev/null) \
+                || warn "npm install/build failed for $name"
+            fi
+          fi
+          ;;
+      esac
+
+      # Skip registration if the command isn't on PATH (e.g. install failed).
+      # Node-style MCPs (command=node) always register; skipping only applies
+      # to CLI-style MCPs whose entry point is a single binary.
+      if [[ "$cmd" != "node" && "$cmd" != "npx" && "$cmd" != "uvx" ]]; then
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+          warn "MCP: $name - command '$cmd' not found after install; skipping registration"
+          continue
+        fi
+      fi
+
       # shellcheck disable=SC2086
       claude mcp add --scope "$scope" "$name" -- $cmd $args 2>/dev/null || true
       step "MCP: $name ($cmd $args)"
@@ -355,14 +394,25 @@ elif [[ -d "$GENESIS_HOME/agents" ]]; then
   cp -f "$GENESIS_HOME"/agents/*.md "$HOME/.claude/agents/" 2>/dev/null || true
 fi
 
-# clawteam team templates (populated from milestone 2.1 onward; safe to no-op today)
+# clawteam team templates. Entries flagged "upstream": true are already
+# bundled with the clawteam pipx install and have no source file of their
+# own - we just log them for visibility in the summary.
 CAT_TEMPLATES="$GENESIS_HOME/catalog/templates.json"
 if [[ -f "$CAT_TEMPLATES" ]]; then
   while IFS= read -r item; do
     [[ -z "$item" ]] && continue
-    name=$(echo "$item"    | jq -r '.name')
-    source=$(echo "$item"  | jq -r '.source')
+    name=$(echo "$item"     | jq -r '.name')
+    upstream=$(echo "$item" | jq -r '.upstream // false')
+    if [[ "$upstream" == "true" ]]; then
+      step "template: $name (upstream - bundled with clawteam)"
+      continue
+    fi
+    source=$(echo "$item"  | jq -r '.source // ""')
     dest=$(echo "$item"    | jq -r '.install_to // ""')
+    if [[ -z "$source" ]]; then
+      warn "template '$name' has no source and no upstream flag; skipping"
+      continue
+    fi
     src="$GENESIS_HOME/$source"
     dst=$(expand_home "${dest:-$HOME/.clawteam/templates/$(basename "$source")}")
     if [[ -f "$src" ]]; then

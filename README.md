@@ -305,19 +305,40 @@ Claude reads `~/.claude/skills/clawteam/SKILL.md` and runs the CLI itself. Becau
 
 ### Built-in team templates
 
-| Template | Source | Roles | Use case |
-|---|---|---|---|
-| `genesis-coder` | Genesis | planner, builder, reviewer, scribe | General-purpose coding |
-| `code-review` | ClawTeam upstream | lead + reviewers | Review a PR / codebase |
-| `hedge-fund` | ClawTeam upstream | varied | Financial research (demo) |
-| `research-paper` | ClawTeam upstream | varied | Literature review |
-| `strategy-room` | ClawTeam upstream | varied | Strategic analysis |
+| Template | Source | Default? | Roles | Use case |
+|---|---|---|---|---|
+| `genesis-coder` | Genesis | ✅ on | planner, builder, reviewer, scribe | General-purpose coding with git worktree isolation |
+| `finance-desk` | Genesis | opt-in | analyst, strategist, backtester | Research → strategy code → backtest. Needs `vibe-trading` MCP. |
+| `deep-research` | Genesis | opt-in | searcher, reader, synthesizer | Literature review → cited report. Uses fetch + playwright MCPs. |
+| `code-review` | ClawTeam upstream | ✅ bundled | lead + reviewers | Review a PR / codebase |
+| `hedge-fund` | ClawTeam upstream | ✅ bundled | 7-agent (value/growth/technical/fundamentals/sentiment analysts + risk + portfolio mgr) | Financial research |
+| `research-paper` | ClawTeam upstream | ✅ bundled | varied | Research paper drafting |
+| `strategy-room` | ClawTeam upstream | ✅ bundled | strategy-lead, systems-analyst, delivery-planner, risk-mapper, decision-editor | Strategic planning |
 
-See all: `clawteam template list`.
+See all: `clawteam template list` (inside sandbox).
+
+**Opt-in templates** ship disabled by default. Enable during install:
+
+```powershell
+.\setup\setup-genesis.ps1 -Enable vibe-trading,finance-desk        # finance stack
+.\setup\setup-genesis.ps1 -Enable deep-research                    # research stack
+.\setup\setup-genesis.ps1 -Enable k-01,deep-research               # research + 58-tool doc intelligence
+```
+
+Re-running the wizard with `-Enable` later is safe; it's additive.
+
+### Opt-in MCP servers (catalog)
+
+| MCP | What it adds | How to enable |
+|---|---|---|
+| `vibe-trading` | 16 finance tools: backtest, factor_analysis, pattern_recognition, analyze_options, run_swarm (DAG finance workflows) | `.\setup\setup-genesis.ps1 -Enable vibe-trading` |
+| `k-01` | 58 tools for universal document + codebase intelligence (semantic chunking, citation matching, large-file analysis) | `.\setup\setup-genesis.ps1 -Enable k-01` |
+
+Provisioning will `pipx install vibe-trading-ai` or `git clone + npm install + build` K-01 automatically inside the sandbox.
 
 ### Writing your own template
 
-Drop a `.toml` file into `~/.clawteam/templates/`. Mirror `~/.clawteam/templates/genesis-coder.toml` as a starting point.
+Drop a `.toml` file into `~/.clawteam/templates/`. Mirror `templates/genesis-coder.toml` as a starting point — it shows the leader/agent schema with `{goal}`, `{team_name}`, `{agent_name}` template variables.
 
 ---
 

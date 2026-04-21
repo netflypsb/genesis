@@ -7,7 +7,49 @@
       "source": "templates/genesis-coder.toml",
       "install_to": "~/.clawteam/templates/genesis-coder.toml",
       "default": true,
-      "tags": ["bundled", "coding"]
+      "tags": ["bundled", "coding"],
+      "description": "4-role parallel coding team (planner/builder/reviewer/scribe) with git worktrees"
+    },
+    {
+      "name": "finance-desk",
+      "source": "templates/finance-desk.toml",
+      "install_to": "~/.clawteam/templates/finance-desk.toml",
+      "default": false,
+      "tags": ["bundled", "finance"],
+      "requires_mcp": ["vibe-trading"],
+      "description": "Research-to-backtest pipeline: analyst -> strategist -> backtester using Vibe-Trading MCP"
+    },
+    {
+      "name": "deep-research",
+      "source": "templates/deep-research.toml",
+      "install_to": "~/.clawteam/templates/deep-research.toml",
+      "default": false,
+      "tags": ["bundled", "research"],
+      "description": "Literature review pipeline: searcher -> reader -> synthesizer using fetch + playwright MCPs"
+    },
+    {
+      "name": "code-review",
+      "upstream": true,
+      "tags": ["upstream"],
+      "description": "ClawTeam built-in: PR / codebase review with lead + reviewers"
+    },
+    {
+      "name": "hedge-fund",
+      "upstream": true,
+      "tags": ["upstream", "finance"],
+      "description": "ClawTeam built-in: 7-agent investment team (value/growth/technical/fundamentals/sentiment analysts + risk manager + portfolio manager)"
+    },
+    {
+      "name": "research-paper",
+      "upstream": true,
+      "tags": ["upstream", "research"],
+      "description": "ClawTeam built-in: research paper generation / analysis"
+    },
+    {
+      "name": "strategy-room",
+      "upstream": true,
+      "tags": ["upstream", "planning"],
+      "description": "ClawTeam built-in: cross-functional strategy team (strategy-lead / systems-analyst / delivery-planner / risk-mapper / decision-editor)"
     }
   ]
 }
