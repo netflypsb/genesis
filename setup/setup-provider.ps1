@@ -272,6 +272,24 @@ Write-Host ""
 $script:Backend = Get-Backend $Backend
 Write-Ok "Backend: $($script:Backend.ToUpper())"
 
+# Auto-start the sandbox if it isn't already running.
+if ($script:Backend -eq "vm") {
+    $repo = Join-Path $env:USERPROFILE "genesis"
+    Push-Location $repo
+    try {
+        $status = & vagrant status --machine-readable 2>$null | Select-String "state,"
+        if ($status -and $status -notmatch "running") {
+            Write-Step "VM is not running - starting it now (vagrant up)..."
+            & vagrant up
+            if ($LASTEXITCODE -ne 0) {
+                Write-Fail "vagrant up failed. Check VirtualBox / Hyper-V conflicts."
+                exit 1
+            }
+            Write-Ok "VM started"
+        }
+    } finally { Pop-Location }
+}
+
 $probe = Invoke-SandboxCmd "echo __genesis_alive__" -Quiet
 if ($probe -notmatch "__genesis_alive__") {
     Write-Fail "Sandbox unreachable. Output: $probe"
