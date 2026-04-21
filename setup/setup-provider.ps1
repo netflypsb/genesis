@@ -90,32 +90,30 @@ function Invoke-SandboxCmd {
 }
 
 # Writes $Content to $Path inside the sandbox.
-# Uses base64 to avoid PowerShell's native-arg quoting hell with vagrant ssh.
+# Uses base64 to carry the payload (no shell-metachar escaping needed), and
+# splits mkdir+write into TWO ssh calls so neither command contains embedded
+# double quotes (which PowerShell 5.1's native-arg splitter mangles when
+# invoking `vagrant ssh -c "..."`).
 function Write-SandboxFile {
     param([string]$Path, [string]$Content)
+
+    # Derive parent dir on the PS side so we don't need a subshell on bash.
+    $parent = ($Path -replace '/[^/]+$', '')
+    if (-not $parent) { $parent = '/' }
 
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($Content)
     $b64   = [Convert]::ToBase64String($bytes)
 
-    # Keep $Path unquoted so ~ is expanded by the remote shell. The caller
-    # controls Path (no spaces/metachars), so this is safe.
-    $cmd = "mkdir -p `"`$(dirname $Path)`" && echo $b64 | base64 -d > $Path"
+    # Neither command contains double quotes => PowerShell passes each as a
+    # single argument to the native exe cleanly.
+    $cmd1 = "mkdir -p $parent"
+    $cmd2 = "echo $b64 | base64 -d > $Path"
 
-    if ($script:Backend -eq "vm") {
-        $repo = Join-Path $env:USERPROFILE "genesis"
-        Push-Location $repo
-        try {
-            & vagrant ssh -c $cmd 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                throw "vagrant ssh failed (exit $LASTEXITCODE) while writing $Path"
-            }
-        } finally { Pop-Location }
-    } else {
-        & wsl.exe -- bash -lc $cmd 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            throw "wsl bash failed (exit $LASTEXITCODE) while writing $Path"
-        }
-    }
+    Invoke-SandboxCmd $cmd1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "mkdir -p $parent failed (exit $LASTEXITCODE)" }
+
+    Invoke-SandboxCmd $cmd2 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "write to $Path failed (exit $LASTEXITCODE)" }
 }
 
 function Read-SandboxFile {
