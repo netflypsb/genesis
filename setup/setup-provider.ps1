@@ -89,24 +89,33 @@ function Invoke-SandboxCmd {
     }
 }
 
-# Writes $Content to $Path inside the sandbox via stdin piping.
+# Writes $Content to $Path inside the sandbox.
+# Uses base64 to avoid PowerShell's native-arg quoting hell with vagrant ssh.
 function Write-SandboxFile {
     param([string]$Path, [string]$Content)
-    $tmp = New-TemporaryFile
-    Set-Content -Path $tmp.FullName -Value $Content -Encoding UTF8 -NoNewline
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Content)
+    $b64   = [Convert]::ToBase64String($bytes)
+
+    # Keep $Path unquoted so ~ is expanded by the remote shell. The caller
+    # controls Path (no spaces/metachars), so this is safe.
+    $cmd = "mkdir -p `"`$(dirname $Path)`" && echo $b64 | base64 -d > $Path"
 
     if ($script:Backend -eq "vm") {
         $repo = Join-Path $env:USERPROFILE "genesis"
         Push-Location $repo
         try {
-            $cmd = 'mkdir -p "$(dirname ' + $Path + ')" && cat > ' + $Path
-            Get-Content $tmp.FullName -Raw | & vagrant ssh -c $cmd | Out-Null
+            & vagrant ssh -c $cmd 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw "vagrant ssh failed (exit $LASTEXITCODE) while writing $Path"
+            }
         } finally { Pop-Location }
     } else {
-        $cmd = 'mkdir -p "$(dirname ' + $Path + ')" && cat > ' + $Path
-        Get-Content $tmp.FullName -Raw | & wsl.exe -- bash -lc $cmd | Out-Null
+        & wsl.exe -- bash -lc $cmd 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "wsl bash failed (exit $LASTEXITCODE) while writing $Path"
+        }
     }
-    Remove-Item $tmp.FullName -Force
 }
 
 function Read-SandboxFile {
