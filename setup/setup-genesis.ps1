@@ -552,4 +552,20 @@ if ($Mode -eq "vm") {
 }
 
 Write-Host ""
+Write-Header "Provider + model configuration (optional)"
+Write-Host "The wizard has written default settings pointing at Ollama Cloud." -ForegroundColor Gray
+Write-Host "To switch provider (OpenRouter / Anthropic / Ollama Local) or pick specific" -ForegroundColor Gray
+Write-Host "models, run the provider wizard. It works for both WSL and VM." -ForegroundColor Gray
+if (Read-YesNo "Run the provider wizard now?" $false) {
+    $providerScript = Join-Path $PSScriptRoot "setup-provider.ps1"
+    if (Test-Path $providerScript) {
+        & $providerScript
+    } else {
+        Write-Warn "setup-provider.ps1 not found at $providerScript"
+    }
+} else {
+    Write-Info "Run it later:  .\setup\setup-provider.ps1"
+}
+
+Write-Host ""
 Write-Header "Genesis setup complete"

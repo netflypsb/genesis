@@ -223,6 +223,37 @@ Or manually: open VS Code → <kbd>F1</kbd> → `Remote-SSH: Connect to Host…`
 
 ---
 
+## AI provider + model picker
+
+By default, Genesis wires Claude Code to **Ollama Cloud** via your Windows Ollama daemon — no key, but requires `ollama signin`. To switch provider or pin specific models, run the **provider wizard**:
+
+```powershell
+cd $env:USERPROFILE\genesis
+.\setup\setup-provider.ps1                         # auto-detects WSL or VM
+.\setup\setup-provider.ps1 -Backend vm             # force VM
+.\setup\setup-provider.ps1 -Backend wsl            # force WSL
+.\setup\setup-provider.ps1 -Provider openrouter    # skip provider prompt
+```
+
+Supported providers with **dynamic model listing** (pulled live from each provider's API):
+
+| Provider | Dynamic model list | Key? | Notes |
+|---|---|---|---|
+| **Ollama Cloud** | curated + your cached `:cloud` models | no | `ollama signin` must be done on Windows |
+| **OpenRouter** | ✅ `GET /api/v1/models` (300+ models) | yes | sk-or-... from https://openrouter.ai/keys |
+| **Anthropic** | ✅ `GET /v1/models` | yes | official endpoint, paid |
+| **Ollama Local** | ✅ `GET /api/tags` (whatever you've `ollama pull`ed) | no | private, on-device |
+
+After picking provider + leader/worker models, the wizard:
+1. Loads the sandbox's existing `~/.claude/settings.json` (preserves permissions, MCP servers, skills paths).
+2. Clears stale provider env vars (`ANTHROPIC_*`).
+3. Writes new ones (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`).
+4. Backs up the previous file to `settings.json.bak`.
+
+Next `claude` session in the sandbox picks up the new config automatically.
+
+The main setup wizard (`setup-genesis.ps1`) offers to run this at the end. Or you can run it standalone any time.
+
 ## Using Claude Code + ClawTeam
 
 Works identically in both WSL and VM backends. All commands below run **inside the sandbox** (`wsl -d Ubuntu` or `vagrant ssh`).

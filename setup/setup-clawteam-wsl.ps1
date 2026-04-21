@@ -1,13 +1,35 @@
 #Requires -Version 5.1
-# Genesis - ClawTeam + Claude Code WSL Setup Wizard v3.0
+# ---------------------------------------------------------------------------
+# DEPRECATED (2026-04) - kept for backwards compatibility only.
+#
+# This was the v3.0 WSL-only provider+setup wizard. It has been replaced by:
+#
+#   setup\setup-genesis.ps1    - full install (WSL default, -VMFirst for VM)
+#   setup\setup-provider.ps1   - provider/model picker (backend-agnostic)
+#
+# The new provider wizard:
+#   - Works for BOTH WSL and VM backends (auto-detects)
+#   - Fetches model lists dynamically from provider APIs
+#   - Preserves existing MCPs / skills / permissions in settings.json
+#
+# Migrate:
+#   .\setup\setup-genesis.ps1          # one-time install
+#   .\setup\setup-provider.ps1         # change provider / models any time
+# ---------------------------------------------------------------------------
+# Genesis - ClawTeam + Claude Code WSL Setup Wizard v3.0 (legacy)
 # Runs from Windows PowerShell, configures everything inside WSL Ubuntu.
-# Default provider: Ollama Cloud via local Ollama desktop app (no API key).
-# Installs MCP servers globally so every ClawTeam-spawned agent inherits them.
 
 param(
     [switch]$NonInteractive,
     [string]$ConfigFile = ""
 )
+
+Write-Host ""
+Write-Host "  ! setup-clawteam-wsl.ps1 is DEPRECATED." -ForegroundColor Yellow
+Write-Host "  Use setup-genesis.ps1 + setup-provider.ps1 instead." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  Continuing with legacy wizard in 5s (Ctrl+C to abort)..." -ForegroundColor DarkGray
+Start-Sleep -Seconds 5
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
