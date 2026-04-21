@@ -96,6 +96,7 @@ function Write-Header([string]$t) {
     Write-Host ("=" * 72) -ForegroundColor DarkCyan
 }
 function Write-Step([string]$t)   { Write-Host "  - $t"  -ForegroundColor Gray }
+function Write-Info([string]$t)   { Write-Host "  $t"    -ForegroundColor Gray }
 function Write-Ok  ([string]$t)   { Write-Host "  OK $t" -ForegroundColor Green }
 function Write-Warn([string]$t)   { Write-Host "  !  $t" -ForegroundColor Yellow }
 function Write-Err ([string]$t)   { Write-Host "  X  $t" -ForegroundColor Red }
@@ -473,7 +474,11 @@ if ($Mode -eq "vm") {
         }
     }
     try {
-        & vagrant up
+        # Always force provisioning to run so re-invoking the wizard with
+        # different -Enable / -Disable / -Skip* flags actually updates the
+        # VM. Without --provision, vagrant skips provisioners on an already-
+        # provisioned VM and your new flags silently do nothing.
+        & vagrant up --provision
         if ($LASTEXITCODE -ne 0) { throw "vagrant up failed" }
     } finally {
         Pop-Location
