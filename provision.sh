@@ -27,6 +27,7 @@ GENESIS_HOME="${GENESIS_HOME:-$HOME/genesis}"
 GENESIS_SKIP_SKILLS="${GENESIS_SKIP_SKILLS:-0}"
 GENESIS_SKIP_MCPS="${GENESIS_SKIP_MCPS:-0}"
 GENESIS_SKIP_OPENCLAW="${GENESIS_SKIP_OPENCLAW:-0}"
+GENESIS_OPENCLAW_DAEMON="${GENESIS_OPENCLAW_DAEMON:-0}"
 GENESIS_OLLAMA_HOST="${GENESIS_OLLAMA_HOST:-}"
 GENESIS_ENABLE="${GENESIS_ENABLE:-}"
 GENESIS_DISABLE="${GENESIS_DISABLE:-}"
@@ -192,6 +193,78 @@ if [[ "$GENESIS_SKIP_OPENCLAW" != "1" ]]; then
   fi
   if ! command -v clawteam >/dev/null 2>&1; then
     warn "clawteam not on PATH after pipx install; open a new shell or 'source ~/.bashrc'"
+  fi
+fi
+
+# ---------------------------------------------------- Phase 5d: OpenClaw daemon (opt-in)
+# Runs BEFORE Phase 8 (skills) so that ~/.openclaw/workspace/ exists when
+# the catalog's also_install_to field copies the clawteam skill into the
+# OpenClaw workspace.
+GENESIS_GATEWAY_STATUS="not-installed"
+if [[ "$GENESIS_OPENCLAW_DAEMON" == "1" ]]; then
+  log "Phase 5d — OpenClaw gateway daemon (systemd --user)"
+  if ! command -v openclaw >/dev/null 2>&1; then
+    warn "openclaw not installed (did Phase 5a run?); skipping daemon setup"
+    GENESIS_GATEWAY_STATUS="missing-openclaw"
+  else
+    mkdir -p "$HOME/.openclaw"
+    # Non-interactive onboard. --auth-choice ollama tells openclaw to use
+    # the Ollama-compatible endpoint; Phase 9 writes the actual model/host
+    # into ~/.claude/settings.json which openclaw picks up. We skip all
+    # interactive features so provisioning never blocks:
+    #   --skip-channels : user pairs Telegram/Discord post-install
+    #   --skip-search   : no web-search plugin setup
+    #   --skip-ui       : no Control UI prompts
+    #   --skip-health   : no interactive healthcheck (we verify below)
+    step "openclaw onboard --install-daemon --non-interactive"
+    if openclaw onboard \
+         --install-daemon \
+         --non-interactive \
+         --auth-choice ollama \
+         --workspace "$HOME/.openclaw/workspace" \
+         --skip-channels --skip-search --skip-ui --skip-health \
+         --json > "$HOME/.openclaw/onboard.json" 2>"$HOME/.openclaw/onboard.err"; then
+      step "onboard OK -> $HOME/.openclaw/onboard.json"
+    else
+      warn "openclaw onboard failed; see $HOME/.openclaw/onboard.err"
+      tail -n 20 "$HOME/.openclaw/onboard.err" 2>/dev/null | sed 's/^/    /'
+      GENESIS_GATEWAY_STATUS="onboard-failed"
+    fi
+
+    # Enable linger so the gateway survives logout. Requires sudo but is
+    # idempotent — ignore failure on systems where the caller can't sudo.
+    if loginctl show-user "$USER" 2>/dev/null | grep -q '^Linger=yes$'; then
+      step "loginctl: linger already enabled for $USER"
+    else
+      if $SUDO loginctl enable-linger "$USER" 2>/dev/null; then
+        step "loginctl: enabled linger for $USER (service survives logout)"
+      else
+        warn "could not enable-linger for $USER; daemon will stop on logout"
+      fi
+    fi
+
+    # Reload and enable the unit installed by onboard. Unit name per
+    # docs.openclaw.ai: openclaw-gateway.service under --user scope.
+    if systemctl --user daemon-reload 2>/dev/null; then
+      if systemctl --user enable --now openclaw-gateway.service 2>/dev/null; then
+        step "systemctl --user: openclaw-gateway enabled and started"
+      else
+        warn "systemctl --user enable openclaw-gateway failed; inspect with 'systemctl --user status openclaw-gateway'"
+      fi
+    else
+      warn "systemctl --user not available (is systemd running as PID 1?)"
+    fi
+
+    # Health probe — gateway listens on 127.0.0.1:18789 by default.
+    # Give systemd ~5s to spin it up before probing.
+    sleep 5
+    if systemctl --user is-active --quiet openclaw-gateway.service 2>/dev/null; then
+      GENESIS_GATEWAY_STATUS="active"
+      step "gateway: active on 127.0.0.1:18789"
+    else
+      GENESIS_GATEWAY_STATUS="inactive"
+      warn "gateway: inactive. Debug: systemctl --user status openclaw-gateway"
+    fi
   fi
 fi
 
@@ -463,4 +536,8 @@ printf '  ollama @:  %s\n'  "$GENESIS_OLLAMA_HOST"
 printf '  skills:    %s under ~/.claude/skills\n' "$(find "$HOME/.claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
 printf '  agents:    %s under ~/.claude/agents\n' "$(find "$HOME/.claude/agents" -mindepth 1 -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l)"
 printf '  templates: %s under ~/.clawteam/templates\n' "$(find "$HOME/.clawteam/templates" -mindepth 1 -maxdepth 1 -type f -name '*.toml' 2>/dev/null | wc -l)"
+printf '  gateway:   %s\n' "$GENESIS_GATEWAY_STATUS"
 log "Done. Next: 'ollama signin' on the Windows host (if not already), then 'claude mcp list' to verify."
+if [[ "$GENESIS_GATEWAY_STATUS" == "active" ]]; then
+  log "Gateway daemon is running. To pair Telegram, see docs/openclaw-daemon.md."
+fi

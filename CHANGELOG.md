@@ -4,6 +4,22 @@ All notable changes to Genesis.
 
 ## [Unreleased] — phase 2 in progress
 
+### Added — Milestone 2.3 (phase2-m2.3 branch)
+- **OpenClaw gateway daemon** opt-in via new `-OpenClawDaemon` wizard flag.
+  Installs `openclaw-gateway.service` as a `systemctl --user` unit
+  inside the sandbox, enables `loginctl enable-linger` so the daemon
+  survives logout, and probes `127.0.0.1:18789` for liveness.
+- New `provision.sh` Phase 5d runs
+  `openclaw onboard --install-daemon --non-interactive --auth-choice ollama`
+  with `--skip-channels/search/ui/health` so provisioning never blocks.
+- Vagrantfile forwards `GENESIS_OPENCLAW_DAEMON` into the VM.
+- Provision summary now shows `gateway: active|inactive|not-installed`.
+- New `docs/openclaw-daemon.md` with full Telegram pairing walkthrough
+  (BotFather -> channels login -> pairing approve -> first DM test),
+  daily ops commands, security model, troubleshooting, and uninstall.
+- Refined `phase2/03-openclaw-daemon-plan.md` for the VM-first world
+  (native systemd, no `/etc/wsl.conf` dance required).
+
 ### Added — Milestone 2.2 (phase2-teams branch, 2026-04-21)
 - **Provider wizard (`setup/setup-provider.ps1`)**: backend-agnostic AI
   provider + model picker. Auto-detects WSL or VM sandbox. Fetches model

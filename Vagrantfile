@@ -75,8 +75,9 @@ Vagrant.configure("2") do |config|
     "GENESIS_DISABLE"       => ENV.fetch("GENESIS_DISABLE", ""),
     "GENESIS_SKIP_SKILLS"   => ENV.fetch("GENESIS_SKIP_SKILLS",  "0"),
     "GENESIS_SKIP_MCPS"     => ENV.fetch("GENESIS_SKIP_MCPS",    "0"),
-    "GENESIS_SKIP_OPENCLAW" => ENV.fetch("GENESIS_SKIP_OPENCLAW","0"),
-    "GENESIS_VM_MODE"       => "1",                      # tell provision.sh it's in the VM
+    "GENESIS_SKIP_OPENCLAW"   => ENV.fetch("GENESIS_SKIP_OPENCLAW",   "0"),
+    "GENESIS_OPENCLAW_DAEMON" => ENV.fetch("GENESIS_OPENCLAW_DAEMON", "0"),
+    "GENESIS_VM_MODE"         => "1",                      # tell provision.sh it's in the VM
   }
   config.vm.provision "shell", privileged: false, env: prov_env, inline: <<-SHELL
     set -e
