@@ -11,8 +11,14 @@ strictly, but the order minimizes rework.
 | **2.1 — `clawteam` skill + `genesis-coder` template + perms** | `v0.2.2` | S | 2.0 |
 | **2.2 — Vibe-Trading MCP + `finance-desk` template (opt-in)** | `v0.2.3` | S | 2.0 |
 | **2.5 — VM-first enablement** (see [`06-vm-first-workflow.md`](06-vm-first-workflow.md)) | `v0.2.4` | M | none |
-| **2.3 — OpenClaw daemon + pairing docs** | `v0.2.5-rc1` | M | 2.1, 2.5 (VM recommended) |
-| **2.4 — Catalog promoted to required; legacy paths removed** | `v0.3.0` | S | 2.0–2.3, 2.5 |
+| **2.3 — OpenClaw daemon + pairing docs** | `v0.2.5` ✅ | M | 2.1, 2.5 (VM recommended) |
+| **2.4 — Catalog promoted to required; legacy paths removed** | `v0.3.0` ✅ | S | 2.0–2.3, 2.5 |
+
+**Phase 2 status: complete (2026-04-21).** M2.3 shipped with a known
+limitation: `openclaw onboard --non-interactive` fails its Ollama probe
+inside VirtualBox NAT (Node fetch quirk). Wizard flag, systemd unit
+install, and pairing docs all ship; manual `openclaw onboard` from
+inside `vagrant ssh` works as a workaround.
 
 Effort key: S = ≤1 session of work, M = 2-4 sessions.
 

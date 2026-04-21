@@ -7,6 +7,16 @@ working, and you check results from anywhere.
 
 This is **opt-in**. Default Genesis installs don't include it.
 
+> ⚠️ **Known limitation (April 2026)** — `openclaw onboard` inside a Vagrant
+> VM sometimes fails its Ollama reachability probe even when the endpoint
+> is demonstrably reachable with `curl` (Node.js fetch quirk with Ollama
+> Cloud over VirtualBox NAT). When this happens, Genesis still installs
+> everything else correctly; only `gateway: inactive` in the summary. You
+> can skip the daemon and use Genesis normally via `vagrant ssh` → `claude`
+> / `clawteam` launch. Tracking this as a follow-up; the workaround is to
+> run `openclaw onboard` interactively from inside `vagrant ssh` (it uses
+> a different probe path in interactive mode).
+
 ## Quick install (VM)
 
 ```powershell

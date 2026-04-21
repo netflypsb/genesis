@@ -340,11 +340,10 @@ if [[ "$GENESIS_SKIP_MCPS" != "1" ]]; then
       step "MCP: $name ($cmd $args)"
     done < <(catalog_enabled_items "$CAT_MCPS")
   else
-    # Legacy fallback: pre-catalog hardcoded list (matches v0.2.0 behavior).
-    warn "catalog/mcps.json missing; using legacy hardcoded MCP list"
-    claude mcp add --scope user fetch      -- uvx mcp-server-fetch 2>/dev/null || true
-    claude mcp add --scope user git        -- uvx mcp-server-git  2>/dev/null || true
-    claude mcp add --scope user playwright -- npx -y @playwright/mcp@latest 2>/dev/null || true
+    # v0.3.0+: catalog is required. Fail fast instead of silently installing
+    # a legacy hardcoded list — that drift caused hard-to-diagnose issues.
+    echo "FATAL: $CAT_MCPS missing. Re-clone Genesis (catalog/ was removed?)" >&2
+    exit 1
   fi
   step "Registered: $(claude mcp list 2>/dev/null | wc -l) entries"
 fi
@@ -383,19 +382,10 @@ if [[ "$GENESIS_SKIP_SKILLS" != "1" ]]; then
         warn "skill '$name' source missing: $src"
       fi
     done < <(catalog_enabled_items "$CAT_SKILLS")
-  elif [[ -d "$GENESIS_HOME/skills" ]]; then
-    # Legacy fallback: walk skills/* directly.
-    warn "catalog/skills.json missing; walking skills/ directly"
-    shopt -s nullglob
-    for skill_dir in "$GENESIS_HOME"/skills/*/; do
-      name=$(basename "$skill_dir")
-      if [[ -f "$skill_dir/SKILL.md" ]]; then
-        mkdir -p "$HOME/.claude/skills/$name"
-        cp -r "$skill_dir"/. "$HOME/.claude/skills/$name/"
-        step "skill: $name"
-      fi
-    done
-    shopt -u nullglob
+  else
+    # v0.3.0+: catalog is required. See Phase 7 for rationale.
+    echo "FATAL: $CAT_SKILLS missing. Re-clone Genesis (catalog/ was removed?)" >&2
+    exit 1
   fi
 fi
 
