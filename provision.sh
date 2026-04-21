@@ -87,9 +87,18 @@ catalog_enabled_items() {
 }
 
 # Expand a leading ~/ in a path to $HOME/.
+#
+# BUG FIX: bash's `${p#~/}` performs tilde expansion on the pattern itself
+# (it becomes `/home/you/` which doesn't match a literal leading `~/`), so
+# the tilde was left in place producing paths like `/home/you/~/.claude/...`.
+# Using positional substring `${p:2}` skips the literal "~/" safely.
 expand_home() {
   local p="$1"
-  [[ "$p" == "~/"* ]] && echo "$HOME/${p#~/}" || echo "$p"
+  if [[ "$p" == "~/"* ]]; then
+    echo "$HOME/${p:2}"
+  else
+    echo "$p"
+  fi
 }
 
 need_sudo() {
@@ -239,10 +248,8 @@ if [[ "$GENESIS_SKIP_SKILLS" != "1" ]]; then
       dst=$(expand_home "${dest:-$HOME/.claude/skills/$name}")
       if [[ -d "$src" && -f "$src/SKILL.md" ]]; then
         mkdir -p "$dst"
-        cp -r "$src"/. "$dst/" 2>&1 | head -3
-        # Sanity check: did anything actually land?
-        file_count=$(find "$dst" -mindepth 1 -maxdepth 3 -type f 2>/dev/null | wc -l)
-        step "skill: $name  (src=$src, dst=$dst, files=$file_count)"
+        cp -r "$src"/. "$dst/"
+        step "skill: $name"
         # Optional secondary install (e.g. OpenClaw workspace). Only if the
         # parent dir exists — don't create ~/.openclaw for users who skipped it.
         if [[ -n "$also" ]]; then
