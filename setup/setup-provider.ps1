@@ -84,7 +84,12 @@ function Invoke-SandboxCmd {
             return $out
         } finally { Pop-Location }
     } else {
-        $out = & wsl.exe -- bash -lc $Cmd 2>&1
+        # -d Ubuntu: without this, wsl.exe uses whatever the "default" distro
+        # is, which can be a minimal distro (e.g. docker-desktop) that has no
+        # bash — user would see '/bin/sh: bash: not found'. Genesis always
+        # provisions into Ubuntu, so target it explicitly.
+        $distro = if ($script:WslDistro) { $script:WslDistro } else { "Ubuntu" }
+        $out = & wsl.exe -d $distro -- bash -lc $Cmd 2>&1
         return $out
     }
 }
