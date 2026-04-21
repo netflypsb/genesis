@@ -114,6 +114,71 @@ function Read-YesNo([string]$prompt, [bool]$default = $true) {
     }
 }
 
+# --- PATH self-healing ---------------------------------------------------
+# Prepend $Dir to both the current session PATH and the persistent user PATH
+# (so newly-spawned shells see it too). Idempotent.
+function Add-ToUserPath {
+    param([Parameter(Mandatory)][string]$Dir)
+    $sep  = [IO.Path]::PathSeparator
+    if (($env:Path -split [regex]::Escape($sep)) -notcontains $Dir) {
+        $env:Path = "$Dir$sep$env:Path"
+    }
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if (-not $userPath) { $userPath = "" }
+    if (($userPath -split [regex]::Escape($sep)) -notcontains $Dir) {
+        [Environment]::SetEnvironmentVariable("Path", "$Dir$sep$userPath".TrimEnd($sep), "User")
+        Write-Step "added to user PATH: $Dir"
+    }
+}
+
+# Resolve a tool by command name, falling back to a list of well-known install
+# paths. If found off-PATH, heals the user PATH. Returns the full path or $null.
+#
+#   Resolve-Tool -Name ollama -Candidates @("$env:LOCALAPPDATA\Programs\Ollama\ollama.exe", ...)
+function Resolve-Tool {
+    param(
+        [Parameter(Mandatory)][string]   $Name,
+        [Parameter(Mandatory)][string[]] $Candidates
+    )
+    # 1. On PATH? Done.
+    $cmd = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    # 2. Walk candidate paths, return first match + heal PATH.
+    foreach ($p in $Candidates) {
+        if ($p -and (Test-Path $p)) {
+            Add-ToUserPath -Dir (Split-Path -Parent $p)
+            Write-Ok "found $Name at $p (PATH healed)"
+            return $p
+        }
+    }
+    return $null
+}
+
+# Install a tool via winget if available; otherwise give the user a direct
+# download URL and wait for them to finish. Returns $true on success.
+function Install-Tool {
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][string] $WingetId,
+        [string] $DownloadUrl = ""
+    )
+    $wing = Get-Command winget -ErrorAction SilentlyContinue
+    if ($wing) {
+        Write-Step "winget install -e --id $WingetId ..."
+        & winget install -e --id $WingetId --accept-package-agreements --accept-source-agreements
+        return ($LASTEXITCODE -eq 0)
+    }
+    Write-Warn "winget not available on this system."
+    if ($DownloadUrl) {
+        Write-Warn "Download $Name manually: $DownloadUrl"
+        Write-Warn "Run the installer, then press ENTER to continue (or Ctrl+C to abort)."
+        Read-Host "waiting"
+        return $true
+    }
+    return $false
+}
+
 # ------------------------------------------------------------------ paths
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $ProvisionScript = Join-Path $RepoRoot "provision.sh"
@@ -149,14 +214,20 @@ Write-Ok "host OK"
 
 # ------------------------------------------------------------------ phase 1: Ollama on host
 Write-Header "Phase 1 --- Ollama on Windows host"
-$ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
-if (-not $ollamaCmd) {
-    Write-Warn "ollama.exe not on PATH."
-    if (Read-YesNo "Install Ollama Desktop via winget now?" $true) {
-        winget install -e --id Ollama.Ollama --accept-package-agreements --accept-source-agreements
-        $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+$ollamaCandidates = @(
+    "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
+    "$env:ProgramFiles\Ollama\ollama.exe",
+    "${env:ProgramFiles(x86)}\Ollama\ollama.exe"
+)
+$ollamaPath = Resolve-Tool -Name "ollama" -Candidates $ollamaCandidates
+if (-not $ollamaPath) {
+    Write-Warn "ollama.exe not found on PATH or at standard install locations."
+    if (Read-YesNo "Install Ollama Desktop now?" $true) {
+        Install-Tool -Name "Ollama" -WingetId "Ollama.Ollama" -DownloadUrl "https://ollama.com/download/OllamaSetup.exe" | Out-Null
+        $ollamaPath = Resolve-Tool -Name "ollama" -Candidates $ollamaCandidates
     }
 }
+$ollamaCmd = if ($ollamaPath) { Get-Command ollama -ErrorAction SilentlyContinue } else { $null }
 if ($ollamaCmd) {
     Write-Ok  "ollama: $($ollamaCmd.Source)"
 
@@ -321,25 +392,56 @@ if ($Mode -eq "vm") {
         if (-not (Read-YesNo "Continue?" $false)) { exit 0 }
     }
 
-    foreach ($tool in @(@{id="Oracle.VirtualBox"; cmd="VBoxManage"}, @{id="Hashicorp.Vagrant"; cmd="vagrant"})) {
-        if (-not (Get-Command $tool.cmd -ErrorAction SilentlyContinue)) {
-            Write-Warn "$($tool.cmd) not found."
-            if (Read-YesNo "Install $($tool.id) via winget?" $true) {
-                winget install -e --id $tool.id --accept-package-agreements --accept-source-agreements
-            } else {
-                Write-Err "Cannot proceed without $($tool.id). Aborting."
-                exit 1
-            }
-        } else {
-            Write-Ok "$($tool.cmd) found"
+    $tools = @(
+        @{
+            Cmd        = "VBoxManage"
+            WingetId   = "Oracle.VirtualBox"
+            Download   = "https://www.virtualbox.org/wiki/Downloads"
+            Candidates = @(
+                "$env:ProgramFiles\Oracle\VirtualBox\VBoxManage.exe",
+                "${env:ProgramFiles(x86)}\Oracle\VirtualBox\VBoxManage.exe"
+            )
+        },
+        @{
+            Cmd        = "vagrant"
+            WingetId   = "Hashicorp.Vagrant"
+            Download   = "https://developer.hashicorp.com/vagrant/downloads"
+            Candidates = @(
+                "$env:ProgramFiles\Vagrant\bin\vagrant.exe",
+                "${env:ProgramFiles(x86)}\Vagrant\bin\vagrant.exe",
+                "$env:HashiCorp_HOME\Vagrant\bin\vagrant.exe"
+            )
         }
+    )
+    foreach ($tool in $tools) {
+        $found = Resolve-Tool -Name $tool.Cmd -Candidates $tool.Candidates
+        if (-not $found) {
+            Write-Warn "$($tool.Cmd) not found (PATH + standard locations)."
+            if (Read-YesNo "Install $($tool.WingetId) now?" $true) {
+                Install-Tool -Name $tool.Cmd -WingetId $tool.WingetId -DownloadUrl $tool.Download | Out-Null
+                $found = Resolve-Tool -Name $tool.Cmd -Candidates $tool.Candidates
+            }
+        }
+        if (-not $found) {
+            Write-Err "Cannot proceed without $($tool.Cmd). Install it and re-run."
+            Write-Err "Direct download: $($tool.Download)"
+            exit 1
+        }
+        Write-Ok "$($tool.Cmd): $found"
     }
 
-    # Hyper-V conflict detection
-    $hv = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -ErrorAction SilentlyContinue).State
-    if ($hv -eq "Enabled") {
-        Write-Warn "Hyper-V is enabled. VirtualBox perf will be degraded."
-        Write-Warn "Consider: bcdedit /set hypervisorlaunchtype off  (reboot required)"
+    # Hyper-V conflict detection (best-effort; requires admin on some SKUs)
+    $hv = $null
+    try {
+        $hv = (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -ErrorAction Stop).State
+    } catch {
+        # Not elevated or Home edition — fall back to reading boot config.
+        $bcd = bcdedit /enum 2>$null | Select-String "hypervisorlaunchtype"
+        if ($bcd -and $bcd.ToString() -notmatch "Off") { $hv = "Likely-Enabled" }
+    }
+    if ($hv -eq "Enabled" -or $hv -eq "Likely-Enabled") {
+        Write-Warn "Hyper-V platform is active. VirtualBox will run (paravirt) but slower."
+        Write-Warn "To fully disable (admin + reboot): bcdedit /set hypervisorlaunchtype off"
     }
 
     if (-not (Test-Path $VagrantFile)) {

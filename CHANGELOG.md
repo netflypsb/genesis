@@ -4,6 +4,17 @@ All notable changes to Genesis.
 
 ## [Unreleased] — phase 2 in progress
 
+### Fixed (wizard UX — 2026-04-21)
+- Wizard no longer bails when `ollama`, `VBoxManage`, or `vagrant` are
+  installed but not yet on PATH. New `Resolve-Tool` helper probes
+  standard install locations (e.g. `%LocalAppData%\Programs\Ollama`,
+  `%ProgramFiles%\Oracle\VirtualBox`, `%ProgramFiles%\Vagrant\bin`) and
+  heals both the session PATH and the persistent user PATH.
+- `Install-Tool` helper falls back to a direct-download URL when
+  `winget` is unavailable (older Windows / Store install missing).
+- Hyper-V detection no longer requires admin: falls back to
+  `bcdedit /enum` when `Get-WindowsOptionalFeature` fails.
+
 ## [0.2.4] — Milestone 2.5: VM-first enablement (phase2 branch)
 
 ### Added
