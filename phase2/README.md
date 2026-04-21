@@ -25,6 +25,9 @@ messaging-channel bridge.
    install selectively.
 6. [`05-roadmap.md`](05-roadmap.md) — phased roadmap with checkpoints, release
    tags, and acceptance criteria.
+7. [`06-vm-first-workflow.md`](06-vm-first-workflow.md) — make the Vagrant VM
+   the default backend: fixes `/mnt/c` slowness, gives real isolation for the
+   OpenClaw daemon, adds VS Code Remote-SSH ergonomics + snapshot workflow.
 
 ## Non-goals for phase 2
 
