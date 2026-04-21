@@ -220,14 +220,13 @@ if [[ "$GENESIS_OPENCLAW_DAEMON" == "1" ]]; then
     # (host, reached via 10.0.2.2 over VirtualBox NAT). Without this,
     # onboard probes 127.0.0.1:11434 inside the VM and fails.
     OLLAMA_REACHABLE_URL="${GENESIS_OLLAMA_HOST:-http://10.0.2.2:11434}"
-    step "openclaw onboard --install-daemon --non-interactive (OLLAMA_HOST=$OLLAMA_REACHABLE_URL)"
-    if OLLAMA_HOST="$OLLAMA_REACHABLE_URL" \
-       OLLAMA_BASE_URL="$OLLAMA_REACHABLE_URL" \
-       openclaw onboard \
+    step "openclaw onboard --install-daemon --non-interactive --custom-base-url $OLLAMA_REACHABLE_URL"
+    if openclaw onboard \
          --install-daemon \
          --non-interactive \
          --accept-risk \
          --auth-choice ollama \
+         --custom-base-url "$OLLAMA_REACHABLE_URL" \
          --workspace "$HOME/.openclaw/workspace" \
          --skip-channels --skip-search --skip-ui --skip-health \
          --json > "$HOME/.openclaw/onboard.json" 2>"$HOME/.openclaw/onboard.err"; then
