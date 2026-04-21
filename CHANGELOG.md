@@ -4,6 +4,37 @@ All notable changes to Genesis.
 
 ## [Unreleased] — phase 2 in progress
 
+### Added — Milestone 2.2 (phase2-teams branch, 2026-04-21)
+- **Provider wizard (`setup/setup-provider.ps1`)**: backend-agnostic AI
+  provider + model picker. Auto-detects WSL or VM sandbox. Fetches model
+  lists dynamically from OpenRouter (`/api/v1/models`), Anthropic
+  (`/v1/models`), and Ollama Local (`/api/tags`). Curated list for Ollama
+  Cloud. Preserves existing permissions/MCPs/skills in settings.json,
+  only rewrites the `env` block. Auto-starts VM if halted. Backs up to
+  `settings.json.bak`.
+- **Surfaced 4 upstream ClawTeam teams** in `catalog/templates.json` via
+  new `upstream: true` flag: `code-review`, `hedge-fund`, `research-paper`,
+  `strategy-room`. No install required (already bundled with clawteam
+  pipx); catalog now documents their roles + use cases.
+- **New Genesis team templates**:
+  - `finance-desk` (opt-in): analyst → strategist → backtester pipeline
+    using Vibe-Trading MCP's 16 finance tools.
+  - `deep-research` (opt-in): searcher → reader → synthesizer literature
+    review pipeline using fetch + playwright MCPs.
+- **New opt-in MCPs in `catalog/mcps.json`**:
+  - `vibe-trading` — installs `vibe-trading-ai` via pipx, registers
+    `vibe-trading-mcp` at user scope.
+  - `k-01` — clones netflypsb/K-01, npm installs + builds, registers
+    `node <path>/dist/server.js` at user scope (58 tools for document +
+    codebase intelligence).
+- **Provision.sh MCP install block**: new `install.kind` field supporting
+  `pipx` and `git-node` install strategies with automatic dependency
+  installation inside the sandbox.
+
+### Deprecated
+- `setup/setup-clawteam-wsl.ps1` — WSL-only legacy wizard, shows a 5s
+  deprecation banner pointing to setup-genesis.ps1 + setup-provider.ps1.
+
 ### Fixed (wizard UX — 2026-04-21)
 - Wizard no longer bails when `ollama`, `VBoxManage`, or `vagrant` are
   installed but not yet on PATH. New `Resolve-Tool` helper probes

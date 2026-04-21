@@ -28,6 +28,36 @@
       "default": true,
       "tags": ["bundled", "browser"],
       "label": "Playwright - browser automation"
+    },
+    {
+      "name": "vibe-trading",
+      "scope": "user",
+      "command": "vibe-trading-mcp",
+      "args": [],
+      "install": {
+        "kind": "pipx",
+        "package": "vibe-trading-ai",
+        "command": "vibe-trading-mcp"
+      },
+      "default": false,
+      "tags": ["opt-in", "finance"],
+      "label": "Vibe-Trading - 16 finance tools (backtest, factor analysis, swarm research)"
+    },
+    {
+      "name": "k-01",
+      "scope": "user",
+      "command": "node",
+      "args": ["~/k-01/dist/server.js"],
+      "install": {
+        "kind": "git-node",
+        "repo": "https://github.com/netflypsb/K-01.git",
+        "path": "~/k-01",
+        "subdir": "k-01",
+        "build": true
+      },
+      "default": false,
+      "tags": ["opt-in", "intelligence"],
+      "label": "K-01 - universal document and codebase intelligence (58 tools)"
     }
   ]
 }

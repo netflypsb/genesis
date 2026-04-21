@@ -76,8 +76,8 @@ param(
     [switch] $AutoSignin,
     [switch] $VMFirst,
     [string] $SyncProjects = "",
-    [string] $Enable = "",
-    [string] $Disable = "",
+    [string[]] $Enable = @(),
+    [string[]] $Disable = @(),
     [string] $RepoUrl = "https://github.com/netflypsb/genesis.git",
     [string] $RepoRef = "main"
 )
@@ -96,6 +96,7 @@ function Write-Header([string]$t) {
     Write-Host ("=" * 72) -ForegroundColor DarkCyan
 }
 function Write-Step([string]$t)   { Write-Host "  - $t"  -ForegroundColor Gray }
+function Write-Info([string]$t)   { Write-Host "  $t"    -ForegroundColor Gray }
 function Write-Ok  ([string]$t)   { Write-Host "  OK $t" -ForegroundColor Green }
 function Write-Warn([string]$t)   { Write-Host "  !  $t" -ForegroundColor Yellow }
 function Write-Err ([string]$t)   { Write-Host "  X  $t" -ForegroundColor Red }
@@ -356,8 +357,10 @@ if ($Mode -eq "wsl") {
     if ($SkipSkills)   { $envFlags += "GENESIS_SKIP_SKILLS=1" }
     if ($SkipMcps)     { $envFlags += "GENESIS_SKIP_MCPS=1" }
     if ($SkipOpenClaw) { $envFlags += "GENESIS_SKIP_OPENCLAW=1" }
-    if ($Enable)       { $envFlags += "GENESIS_ENABLE='$Enable'" }
-    if ($Disable)      { $envFlags += "GENESIS_DISABLE='$Disable'" }
+    $enableFlat  = ((@($Enable)  -join ',') -replace ',\s+', ',').Trim(',')
+    $disableFlat = ((@($Disable) -join ',') -replace ',\s+', ',').Trim(',')
+    if ($enableFlat)  { $envFlags += "GENESIS_ENABLE='$enableFlat'" }
+    if ($disableFlat) { $envFlags += "GENESIS_DISABLE='$disableFlat'" }
 
     $envStr = $envFlags -join " "
     Write-Header "Phase 3 - provisioning inside WSL ($Distro)"
@@ -452,8 +455,13 @@ if ($Mode -eq "vm") {
     Write-Header "Phase 3 - vagrant up"
     Push-Location $RepoRoot
     # Export catalog + skip env for the Vagrantfile to forward to provision.sh.
-    $env:GENESIS_ENABLE        = $Enable
-    $env:GENESIS_DISABLE       = $Disable
+    # Normalise array-typed params: support both "-Enable a,b" (array form)
+    # and '"-Enable a,b"' (single string) and multiple "-Enable a -Enable b".
+    # Re-split on commas to collapse any mixed input into a single list.
+    $enableFlat  = ((@($Enable)  -join ',') -replace ',\s+', ',').Trim(',')
+    $disableFlat = ((@($Disable) -join ',') -replace ',\s+', ',').Trim(',')
+    $env:GENESIS_ENABLE        = $enableFlat
+    $env:GENESIS_DISABLE       = $disableFlat
     $env:GENESIS_SKIP_SKILLS   = if ($SkipSkills)   { "1" } else { "0" }
     $env:GENESIS_SKIP_MCPS     = if ($SkipMcps)     { "1" } else { "0" }
     $env:GENESIS_SKIP_OPENCLAW = if ($SkipOpenClaw) { "1" } else { "0" }
@@ -466,7 +474,11 @@ if ($Mode -eq "vm") {
         }
     }
     try {
-        & vagrant up
+        # Always force provisioning to run so re-invoking the wizard with
+        # different -Enable / -Disable / -Skip* flags actually updates the
+        # VM. Without --provision, vagrant skips provisioners on an already-
+        # provisioned VM and your new flags silently do nothing.
+        & vagrant up --provision
         if ($LASTEXITCODE -ne 0) { throw "vagrant up failed" }
     } finally {
         Pop-Location
