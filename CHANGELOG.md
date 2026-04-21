@@ -2,7 +2,55 @@
 
 All notable changes to Genesis.
 
-## [Unreleased] — phase 2 in progress
+## [0.3.0] — Phase 2 complete (2026-04-21)
+
+Catalog-driven provisioning is now the only code path. Genesis repo is
+fully modular: teams, skills, MCPs, and agents are all installed from
+`catalog/*.json` entries the wizard reads at install time.
+
+### Removed (breaking)
+- Legacy `mcp/registry.json` deleted. The authoritative MCP manifest is
+  now `catalog/mcps.json` — has been since v0.2.1 but the old file lingered.
+- Legacy fallback paths in `provision.sh` for missing `catalog/mcps.json`
+  or `catalog/skills.json` — now a fatal error ("re-clone Genesis").
+  Rationale: silent drift between catalog and hardcoded lists caused
+  hard-to-diagnose issues during M2.2 development.
+
+### Migration for v0.2.x users
+- Existing installs keep working; `~/.claude/*`, `~/.clawteam/*`, and
+  registered MCPs are untouched.
+- On next `vagrant provision` / `setup-genesis.ps1` run, the new code
+  path installs identically to the catalog contents.
+- No manual action needed unless you had local edits to
+  `mcp/registry.json` (file no longer exists — port to `catalog/mcps.json`).
+
+## [0.2.5] — Milestone 2.3 (OpenClaw daemon, partial)
+
+### Added — Milestone 2.3 (phase2-m2.3 branch, partial — tracked as v0.2.5)
+
+**Known limitation:** `openclaw onboard --non-interactive` inside the VM
+fails its Ollama probe under VirtualBox NAT (Node.js fetch quirk — `curl`
+works, Node's bundled fetch doesn't, despite `--custom-base-url`). Genesis
+provision completes successfully and `gateway: inactive` is reported in
+the summary. The rest of Genesis (Claude Code, ClawTeam, skills, agents,
+MCPs) is unaffected. Workaround: run `openclaw onboard` manually inside
+`vagrant ssh` (interactive mode uses a different probe path).
+
+
+- **OpenClaw gateway daemon** opt-in via new `-OpenClawDaemon` wizard flag.
+  Installs `openclaw-gateway.service` as a `systemctl --user` unit
+  inside the sandbox, enables `loginctl enable-linger` so the daemon
+  survives logout, and probes `127.0.0.1:18789` for liveness.
+- New `provision.sh` Phase 5d runs
+  `openclaw onboard --install-daemon --non-interactive --auth-choice ollama`
+  with `--skip-channels/search/ui/health` so provisioning never blocks.
+- Vagrantfile forwards `GENESIS_OPENCLAW_DAEMON` into the VM.
+- Provision summary now shows `gateway: active|inactive|not-installed`.
+- New `docs/openclaw-daemon.md` with full Telegram pairing walkthrough
+  (BotFather -> channels login -> pairing approve -> first DM test),
+  daily ops commands, security model, troubleshooting, and uninstall.
+- Refined `phase2/03-openclaw-daemon-plan.md` for the VM-first world
+  (native systemd, no `/etc/wsl.conf` dance required).
 
 ### Added — Milestone 2.2 (phase2-teams branch, 2026-04-21)
 - **Provider wizard (`setup/setup-provider.ps1`)**: backend-agnostic AI

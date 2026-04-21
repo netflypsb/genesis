@@ -186,7 +186,21 @@ vagrant snapshot delete pre-agent-run             # when you don't need it anymo
 
 Full snapshot workflow: [`docs/vm-snapshots.md`](docs/vm-snapshots.md).
 
-### 📝 VM-first backend — all-in-one cheat sheet
+### � Remote-control via DM — OpenClaw gateway (opt-in)
+
+Install the gateway daemon to DM your sandbox from anywhere:
+
+```powershell
+.\setup\setup-genesis.ps1 -VMFirst -OpenClawDaemon
+```
+
+After the wizard finishes, pair a Telegram bot (or Discord, Slack, etc.)
+and DM it commands like `clawteam launch genesis-coder --goal "..."`.
+The VM keeps agents running even when your laptop is closed.
+
+Full walkthrough: [`docs/openclaw-daemon.md`](docs/openclaw-daemon.md).
+
+### �📝 VM-first backend — all-in-one cheat sheet
 
 ```powershell
 # First time

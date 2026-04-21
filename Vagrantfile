@@ -27,6 +27,10 @@ Vagrant.configure("2") do |config|
   # the VM so `git push` works without PATs or copied keyfiles.
   config.ssh.forward_agent = true
 
+  # Boot timeout — default 300s is tight on slow disks / low-RAM hosts.
+  # Bumped to 600s after observing real-world timeouts on 16 GB laptops.
+  config.vm.boot_timeout = 600
+
   # --- port forwards (host → guest) ---
   config.vm.network "forwarded_port", guest: 18789, host: 18789  # OpenClaw
   config.vm.network "forwarded_port", guest: 8080,  host: 8080   # ClawTeam board
@@ -75,8 +79,9 @@ Vagrant.configure("2") do |config|
     "GENESIS_DISABLE"       => ENV.fetch("GENESIS_DISABLE", ""),
     "GENESIS_SKIP_SKILLS"   => ENV.fetch("GENESIS_SKIP_SKILLS",  "0"),
     "GENESIS_SKIP_MCPS"     => ENV.fetch("GENESIS_SKIP_MCPS",    "0"),
-    "GENESIS_SKIP_OPENCLAW" => ENV.fetch("GENESIS_SKIP_OPENCLAW","0"),
-    "GENESIS_VM_MODE"       => "1",                      # tell provision.sh it's in the VM
+    "GENESIS_SKIP_OPENCLAW"   => ENV.fetch("GENESIS_SKIP_OPENCLAW",   "0"),
+    "GENESIS_OPENCLAW_DAEMON" => ENV.fetch("GENESIS_OPENCLAW_DAEMON", "0"),
+    "GENESIS_VM_MODE"         => "1",                      # tell provision.sh it's in the VM
   }
   config.vm.provision "shell", privileged: false, env: prov_env, inline: <<-SHELL
     set -e

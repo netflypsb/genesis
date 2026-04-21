@@ -63,6 +63,11 @@
 
 .EXAMPLE
     .\setup\setup-genesis.ps1 -Enable vibe-trading -Disable playwright
+
+.EXAMPLE
+    .\setup\setup-genesis.ps1 -VMFirst -OpenClawDaemon
+    # VM + install openclaw-gateway as a systemd --user service for
+    # remote DM-based team launching (pair with Telegram post-install).
 #>
 [CmdletBinding()]
 param(
@@ -75,6 +80,7 @@ param(
     [switch] $SkipOpenClaw,
     [switch] $AutoSignin,
     [switch] $VMFirst,
+    [switch] $OpenClawDaemon,
     [string] $SyncProjects = "",
     [string[]] $Enable = @(),
     [string[]] $Disable = @(),
@@ -354,9 +360,10 @@ if ($Mode -eq "wsl") {
     $envFlags = @()
     $envFlags += "GENESIS_REPO_URL='$RepoUrl'"
     $envFlags += "GENESIS_REPO_REF='$RepoRef'"
-    if ($SkipSkills)   { $envFlags += "GENESIS_SKIP_SKILLS=1" }
-    if ($SkipMcps)     { $envFlags += "GENESIS_SKIP_MCPS=1" }
-    if ($SkipOpenClaw) { $envFlags += "GENESIS_SKIP_OPENCLAW=1" }
+    if ($SkipSkills)    { $envFlags += "GENESIS_SKIP_SKILLS=1" }
+    if ($SkipMcps)      { $envFlags += "GENESIS_SKIP_MCPS=1" }
+    if ($SkipOpenClaw)  { $envFlags += "GENESIS_SKIP_OPENCLAW=1" }
+    if ($OpenClawDaemon){ $envFlags += "GENESIS_OPENCLAW_DAEMON=1" }
     $enableFlat  = ((@($Enable)  -join ',') -replace ',\s+', ',').Trim(',')
     $disableFlat = ((@($Disable) -join ',') -replace ',\s+', ',').Trim(',')
     if ($enableFlat)  { $envFlags += "GENESIS_ENABLE='$enableFlat'" }
@@ -462,9 +469,10 @@ if ($Mode -eq "vm") {
     $disableFlat = ((@($Disable) -join ',') -replace ',\s+', ',').Trim(',')
     $env:GENESIS_ENABLE        = $enableFlat
     $env:GENESIS_DISABLE       = $disableFlat
-    $env:GENESIS_SKIP_SKILLS   = if ($SkipSkills)   { "1" } else { "0" }
-    $env:GENESIS_SKIP_MCPS     = if ($SkipMcps)     { "1" } else { "0" }
-    $env:GENESIS_SKIP_OPENCLAW = if ($SkipOpenClaw) { "1" } else { "0" }
+    $env:GENESIS_SKIP_SKILLS     = if ($SkipSkills)     { "1" } else { "0" }
+    $env:GENESIS_SKIP_MCPS       = if ($SkipMcps)       { "1" } else { "0" }
+    $env:GENESIS_SKIP_OPENCLAW   = if ($SkipOpenClaw)   { "1" } else { "0" }
+    $env:GENESIS_OPENCLAW_DAEMON = if ($OpenClawDaemon) { "1" } else { "0" }
     if ($SyncProjects) {
         if (Test-Path $SyncProjects) {
             $env:GENESIS_SYNC_PROJECTS = $SyncProjects
