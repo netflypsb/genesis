@@ -80,8 +80,8 @@ Vagrant.configure("2") do |config|
   }
   config.vm.provision "shell", privileged: false, env: prov_env, inline: <<-SHELL
     set -e
-    cd /vagrant
-    chmod +x provision.sh
-    GENESIS_HOME=/vagrant bash ./provision.sh
+    # /vagrant is mounted read-only (intentional, M2.5 isolation). Don't
+    # chmod +x — bash doesn't need the exec bit.
+    GENESIS_HOME=/vagrant bash /vagrant/provision.sh
   SHELL
 end
