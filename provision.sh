@@ -216,8 +216,14 @@ if [[ "$GENESIS_OPENCLAW_DAEMON" == "1" ]]; then
     #   --skip-search   : no web-search plugin setup
     #   --skip-ui       : no Control UI prompts
     #   --skip-health   : no interactive healthcheck (we verify below)
-    step "openclaw onboard --install-daemon --non-interactive"
-    if openclaw onboard \
+    # Point openclaw at the same Ollama endpoint the VM uses elsewhere
+    # (host, reached via 10.0.2.2 over VirtualBox NAT). Without this,
+    # onboard probes 127.0.0.1:11434 inside the VM and fails.
+    OLLAMA_REACHABLE_URL="${GENESIS_OLLAMA_HOST:-http://10.0.2.2:11434}"
+    step "openclaw onboard --install-daemon --non-interactive (OLLAMA_HOST=$OLLAMA_REACHABLE_URL)"
+    if OLLAMA_HOST="$OLLAMA_REACHABLE_URL" \
+       OLLAMA_BASE_URL="$OLLAMA_REACHABLE_URL" \
+       openclaw onboard \
          --install-daemon \
          --non-interactive \
          --accept-risk \
