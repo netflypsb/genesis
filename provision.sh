@@ -14,6 +14,10 @@
 #   GENESIS_OLLAMA_HOST   default: http://host.docker.internal:11434 inside
 #                         WSL (mirrored) or http://10.0.2.2:11434 inside
 #                         VirtualBox NAT. Wizard sets this explicitly.
+#   GENESIS_ENABLE        comma-separated list of catalog item names to
+#                         force-enable (overrides `default: false`).
+#   GENESIS_DISABLE       comma-separated list of catalog item names to
+#                         force-disable (overrides `default: true`).
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -24,6 +28,8 @@ GENESIS_SKIP_SKILLS="${GENESIS_SKIP_SKILLS:-0}"
 GENESIS_SKIP_MCPS="${GENESIS_SKIP_MCPS:-0}"
 GENESIS_SKIP_OPENCLAW="${GENESIS_SKIP_OPENCLAW:-0}"
 GENESIS_OLLAMA_HOST="${GENESIS_OLLAMA_HOST:-}"
+GENESIS_ENABLE="${GENESIS_ENABLE:-}"
+GENESIS_DISABLE="${GENESIS_DISABLE:-}"
 
 # Auto-detect the best Ollama endpoint if not provided.
 # Order of preference:
@@ -44,6 +50,39 @@ fi
 log()  { printf '\n\033[1;36m==>\033[0m %s\n' "$*"; }
 step() { printf '  \033[1;32m•\033[0m %s\n' "$*"; }
 warn() { printf '  \033[1;33m!\033[0m %s\n' "$*" >&2; }
+
+# ---------------------------------------------------------------- catalog
+# Resolution rule for a catalog item's effective enabled state:
+#   name in GENESIS_DISABLE  -> disabled (highest priority)
+#   name in GENESIS_ENABLE   -> enabled
+#   else                     -> item's `default` field
+catalog_is_enabled() {
+  local name="$1" default="$2"
+  if [[ ",${GENESIS_DISABLE}," == *",${name},"* ]]; then return 1; fi
+  if [[ ",${GENESIS_ENABLE}," == *",${name},"* ]]; then  return 0; fi
+  [[ "$default" == "true" ]]
+}
+
+# Emit each enabled item as a compact JSON line from a catalog file.
+# Args: catalog file (absolute path)
+catalog_enabled_items() {
+  local file="$1"
+  [[ -f "$file" ]] || return 0
+  local item name default
+  while IFS= read -r item; do
+    name=$(echo "$item"    | jq -r '.name')
+    default=$(echo "$item" | jq -r '.default')
+    if catalog_is_enabled "$name" "$default"; then
+      echo "$item"
+    fi
+  done < <(jq -c '.items[]' "$file")
+}
+
+# Expand a leading ~/ in a path to $HOME/.
+expand_home() {
+  local p="$1"
+  [[ "$p" == "~/"* ]] && echo "$HOME/${p#~/}" || echo "$p"
+}
 
 need_sudo() {
   if [[ $EUID -eq 0 ]]; then SUDO=""; else SUDO="sudo"; fi
@@ -144,28 +183,68 @@ npx --yes playwright install --with-deps chromium || warn "playwright install fa
 # ---------------------------------------------------- Phase 7: MCP user-scope
 if [[ "$GENESIS_SKIP_MCPS" != "1" ]]; then
   log "Phase 7 — register MCP servers at user scope"
-  # claude mcp add is idempotent-ish: re-adding overwrites. Ignore duplicates.
-  claude mcp add --scope user fetch      -- uvx mcp-server-fetch 2>/dev/null || \
-    claude mcp add --scope user -- fetch uvx mcp-server-fetch || true
-  claude mcp add --scope user git        -- uvx mcp-server-git  2>/dev/null || true
-  claude mcp add --scope user playwright -- npx -y @playwright/mcp@latest 2>/dev/null || true
+  CAT_MCPS="$GENESIS_HOME/catalog/mcps.json"
+  if [[ -f "$CAT_MCPS" ]]; then
+    # Catalog-driven path (milestone 2.0+).
+    while IFS= read -r item; do
+      [[ -z "$item" ]] && continue
+      name=$(echo "$item"   | jq -r '.name')
+      scope=$(echo "$item"  | jq -r '.scope // "user"')
+      cmd=$(echo "$item"    | jq -r '.command')
+      # jq outputs args as whitespace-separated; safe because our args are all
+      # simple tokens (no spaces in any registered arg today).
+      args=$(echo "$item"   | jq -r '.args | join(" ")')
+      # claude mcp add is idempotent-ish; ignore "already exists" on re-run.
+      # shellcheck disable=SC2086
+      claude mcp add --scope "$scope" "$name" -- $cmd $args 2>/dev/null || true
+      step "MCP: $name ($cmd $args)"
+    done < <(catalog_enabled_items "$CAT_MCPS")
+  else
+    # Legacy fallback: pre-catalog hardcoded list (matches v0.2.0 behavior).
+    warn "catalog/mcps.json missing; using legacy hardcoded MCP list"
+    claude mcp add --scope user fetch      -- uvx mcp-server-fetch 2>/dev/null || true
+    claude mcp add --scope user git        -- uvx mcp-server-git  2>/dev/null || true
+    claude mcp add --scope user playwright -- npx -y @playwright/mcp@latest 2>/dev/null || true
+  fi
   step "Registered: $(claude mcp list 2>/dev/null | wc -l) entries"
 fi
 
 # ---------------------------------------------------- Phase 8: Skills
-if [[ "$GENESIS_SKIP_SKILLS" != "1" && -d "$GENESIS_HOME/skills" ]]; then
+if [[ "$GENESIS_SKIP_SKILLS" != "1" ]]; then
   log "Phase 8 — bundled Claude Code skills"
   mkdir -p "$HOME/.claude/skills"
-  shopt -s nullglob
-  for skill_dir in "$GENESIS_HOME"/skills/*/; do
-    name=$(basename "$skill_dir")
-    if [[ -f "$skill_dir/SKILL.md" ]]; then
-      mkdir -p "$HOME/.claude/skills/$name"
-      cp -r "$skill_dir"/. "$HOME/.claude/skills/$name/"
-      step "skill: $name"
-    fi
-  done
-  shopt -u nullglob
+  CAT_SKILLS="$GENESIS_HOME/catalog/skills.json"
+  if [[ -f "$CAT_SKILLS" ]]; then
+    # Catalog-driven path.
+    while IFS= read -r item; do
+      [[ -z "$item" ]] && continue
+      name=$(echo "$item"    | jq -r '.name')
+      source=$(echo "$item"  | jq -r '.source')
+      dest=$(echo "$item"    | jq -r '.install_to // ""')
+      src="$GENESIS_HOME/$source"
+      dst=$(expand_home "${dest:-$HOME/.claude/skills/$name}")
+      if [[ -d "$src" && -f "$src/SKILL.md" ]]; then
+        mkdir -p "$dst"
+        cp -r "$src"/. "$dst/"
+        step "skill: $name"
+      else
+        warn "skill '$name' source missing: $src"
+      fi
+    done < <(catalog_enabled_items "$CAT_SKILLS")
+  elif [[ -d "$GENESIS_HOME/skills" ]]; then
+    # Legacy fallback: walk skills/* directly.
+    warn "catalog/skills.json missing; walking skills/ directly"
+    shopt -s nullglob
+    for skill_dir in "$GENESIS_HOME"/skills/*/; do
+      name=$(basename "$skill_dir")
+      if [[ -f "$skill_dir/SKILL.md" ]]; then
+        mkdir -p "$HOME/.claude/skills/$name"
+        cp -r "$skill_dir"/. "$HOME/.claude/skills/$name/"
+        step "skill: $name"
+      fi
+    done
+    shopt -u nullglob
+  fi
 fi
 
 # ---------------------------------------------------- Phase 9: Claude Code env
@@ -191,11 +270,50 @@ p.write_text(json.dumps(data, indent=2))
 print(f"wrote {p}")
 PY
 
-# ---------------------------------------------------- Phase 10: agent files
-if [[ -d "$GENESIS_HOME/agents" ]]; then
-  log "Phase 10 — agent prompts → ~/.claude/agents/"
-  mkdir -p "$HOME/.claude/agents"
+# ---------------------------------------------------- Phase 10: agent files + clawteam templates
+log "Phase 10 — agent prompts and clawteam templates"
+mkdir -p "$HOME/.claude/agents" "$HOME/.clawteam/templates"
+
+CAT_AGENTS="$GENESIS_HOME/catalog/agents.json"
+if [[ -f "$CAT_AGENTS" ]]; then
+  while IFS= read -r item; do
+    [[ -z "$item" ]] && continue
+    name=$(echo "$item"    | jq -r '.name')
+    source=$(echo "$item"  | jq -r '.source')
+    dest=$(echo "$item"    | jq -r '.install_to // ""')
+    src="$GENESIS_HOME/$source"
+    dst=$(expand_home "${dest:-$HOME/.claude/agents/$(basename "$source")}")
+    if [[ -f "$src" ]]; then
+      mkdir -p "$(dirname "$dst")"
+      cp -f "$src" "$dst"
+      step "agent: $name"
+    else
+      warn "agent '$name' source missing: $src"
+    fi
+  done < <(catalog_enabled_items "$CAT_AGENTS")
+elif [[ -d "$GENESIS_HOME/agents" ]]; then
+  warn "catalog/agents.json missing; copying agents/*.md directly"
   cp -f "$GENESIS_HOME"/agents/*.md "$HOME/.claude/agents/" 2>/dev/null || true
+fi
+
+# clawteam team templates (populated from milestone 2.1 onward; safe to no-op today)
+CAT_TEMPLATES="$GENESIS_HOME/catalog/templates.json"
+if [[ -f "$CAT_TEMPLATES" ]]; then
+  while IFS= read -r item; do
+    [[ -z "$item" ]] && continue
+    name=$(echo "$item"    | jq -r '.name')
+    source=$(echo "$item"  | jq -r '.source')
+    dest=$(echo "$item"    | jq -r '.install_to // ""')
+    src="$GENESIS_HOME/$source"
+    dst=$(expand_home "${dest:-$HOME/.clawteam/templates/$(basename "$source")}")
+    if [[ -f "$src" ]]; then
+      mkdir -p "$(dirname "$dst")"
+      cp -f "$src" "$dst"
+      step "template: $name"
+    else
+      warn "template '$name' source missing: $src"
+    fi
+  done < <(catalog_enabled_items "$CAT_TEMPLATES")
 fi
 
 # ---------------------------------------------------- Phase 11: summary

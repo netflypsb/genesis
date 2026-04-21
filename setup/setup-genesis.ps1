@@ -30,6 +30,14 @@
 .PARAMETER AutoSignin
     Run `ollama signin` on the host if Ollama is installed but not signed in.
 
+.PARAMETER Enable
+    Comma-separated list of catalog item names to force-enable (overrides
+    `default: false`). Matches names in catalog/*.json.
+
+.PARAMETER Disable
+    Comma-separated list of catalog item names to force-disable (overrides
+    `default: true`). Matches names in catalog/*.json.
+
 .PARAMETER RepoUrl
     Git URL to clone inside the sandbox. Default: https://github.com/netflypsb/genesis.git
 
@@ -38,6 +46,9 @@
 
 .EXAMPLE
     .\setup\setup-genesis.ps1 -Mode vm -SkipSkills
+
+.EXAMPLE
+    .\setup\setup-genesis.ps1 -Enable vibe-trading -Disable playwright
 #>
 [CmdletBinding()]
 param(
@@ -49,6 +60,8 @@ param(
     [switch] $SkipMcps,
     [switch] $SkipOpenClaw,
     [switch] $AutoSignin,
+    [string] $Enable = "",
+    [string] $Disable = "",
     [string] $RepoUrl = "https://github.com/netflypsb/genesis.git",
     [string] $RepoRef = "main"
 )
@@ -253,6 +266,8 @@ if ($Mode -eq "wsl") {
     if ($SkipSkills)   { $envFlags += "GENESIS_SKIP_SKILLS=1" }
     if ($SkipMcps)     { $envFlags += "GENESIS_SKIP_MCPS=1" }
     if ($SkipOpenClaw) { $envFlags += "GENESIS_SKIP_OPENCLAW=1" }
+    if ($Enable)       { $envFlags += "GENESIS_ENABLE='$Enable'" }
+    if ($Disable)      { $envFlags += "GENESIS_DISABLE='$Disable'" }
 
     $envStr = $envFlags -join " "
     Write-Header "Phase 3 - provisioning inside WSL ($Distro)"
@@ -315,6 +330,12 @@ if ($Mode -eq "vm") {
 
     Write-Header "Phase 3 - vagrant up"
     Push-Location $RepoRoot
+    # Export catalog + skip env for the Vagrantfile to forward to provision.sh.
+    $env:GENESIS_ENABLE        = $Enable
+    $env:GENESIS_DISABLE       = $Disable
+    $env:GENESIS_SKIP_SKILLS   = if ($SkipSkills)   { "1" } else { "0" }
+    $env:GENESIS_SKIP_MCPS     = if ($SkipMcps)     { "1" } else { "0" }
+    $env:GENESIS_SKIP_OPENCLAW = if ($SkipOpenClaw) { "1" } else { "0" }
     try {
         & vagrant up
         if ($LASTEXITCODE -ne 0) { throw "vagrant up failed" }

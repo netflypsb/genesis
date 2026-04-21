@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "kind": "agents",
+  "items": [
+    {
+      "name": "planner",
+      "source": "agents/planner.md",
+      "install_to": "~/.claude/agents/planner.md",
+      "default": true,
+      "tags": ["bundled", "coding"]
+    },
+    {
+      "name": "builder",
+      "source": "agents/builder.md",
+      "install_to": "~/.claude/agents/builder.md",
+      "default": true,
+      "tags": ["bundled", "coding"]
+    },
+    {
+      "name": "reviewer",
+      "source": "agents/reviewer.md",
+      "install_to": "~/.claude/agents/reviewer.md",
+      "default": true,
+      "tags": ["bundled", "coding"]
+    },
+    {
+      "name": "scribe",
+      "source": "agents/scribe.md",
+      "install_to": "~/.claude/agents/scribe.md",
+      "default": true,
+      "tags": ["bundled", "coding"]
+    }
+  ]
+}

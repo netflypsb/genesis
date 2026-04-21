@@ -33,9 +33,16 @@ Vagrant.configure("2") do |config|
   end
 
   # --- provisioning: shared script with WSL path ---
-  config.vm.provision "shell", privileged: false, env: {
-    "GENESIS_OLLAMA_HOST" => "http://10.0.2.2:11434"  # VirtualBox NAT → host
-  }, inline: <<-SHELL
+  # Forward catalog-selection env from host shell (set by setup-genesis.ps1).
+  prov_env = {
+    "GENESIS_OLLAMA_HOST"  => "http://10.0.2.2:11434",  # VirtualBox NAT → host
+    "GENESIS_ENABLE"       => ENV.fetch("GENESIS_ENABLE",  ""),
+    "GENESIS_DISABLE"      => ENV.fetch("GENESIS_DISABLE", ""),
+    "GENESIS_SKIP_SKILLS"  => ENV.fetch("GENESIS_SKIP_SKILLS",  "0"),
+    "GENESIS_SKIP_MCPS"    => ENV.fetch("GENESIS_SKIP_MCPS",    "0"),
+    "GENESIS_SKIP_OPENCLAW"=> ENV.fetch("GENESIS_SKIP_OPENCLAW","0"),
+  }
+  config.vm.provision "shell", privileged: false, env: prov_env, inline: <<-SHELL
     set -e
     cd /vagrant
     chmod +x provision.sh

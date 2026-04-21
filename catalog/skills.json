@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "kind": "skills",
+  "items": [
+    {
+      "name": "docx",
+      "source": "skills/docx",
+      "install_to": "~/.claude/skills/docx",
+      "default": true,
+      "tags": ["office", "bundled"]
+    },
+    {
+      "name": "pdf",
+      "source": "skills/pdf",
+      "install_to": "~/.claude/skills/pdf",
+      "default": true,
+      "tags": ["office", "bundled"]
+    },
+    {
+      "name": "xlsx",
+      "source": "skills/xlsx",
+      "install_to": "~/.claude/skills/xlsx",
+      "default": true,
+      "tags": ["office", "bundled"]
+    },
+    {
+      "name": "pptx",
+      "source": "skills/pptx",
+      "install_to": "~/.claude/skills/pptx",
+      "default": true,
+      "tags": ["office", "bundled"]
+    },
+    {
+      "name": "frontend-design",
+      "source": "skills/frontend-design",
+      "install_to": "~/.claude/skills/frontend-design",
+      "default": true,
+      "tags": ["web", "bundled"]
+    },
+    {
+      "name": "advertisement",
+      "source": "skills/advertisement",
+      "install_to": "~/.claude/skills/advertisement",
+      "default": true,
+      "tags": ["marketing", "bundled"]
+    }
+  ]
+}

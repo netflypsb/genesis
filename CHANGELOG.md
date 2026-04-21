@@ -2,7 +2,41 @@
 
 All notable changes to Genesis.
 
-## [Unreleased]
+## [Unreleased] — phase 2 in progress
+
+## [0.2.1] — Milestone 2.0: catalog foundation (phase2 branch)
+
+### Added
+- `catalog/` directory with four manifest files: `skills.json`, `mcps.json`,
+  `agents.json`, `templates.json`. Each is the single source of truth for
+  what the provisioner installs. Documented in `catalog/README.md`.
+- `setup-genesis.ps1` learns `-Enable <names>` and `-Disable <names>` flags
+  (comma-separated) that override each catalog item's `default` field.
+  Passed to provision.sh as `GENESIS_ENABLE` / `GENESIS_DISABLE`.
+- `provision.sh` Phases 7 (MCPs), 8 (skills), 10 (agents + clawteam
+  templates) now iterate their catalog files via jq. Legacy fallback
+  preserved: if `catalog/` is missing, the old hardcoded behavior runs
+  unchanged.
+- `scripts/validate-catalog.sh` — parses each catalog, enforces schema,
+  checks every `source` path resolves.
+- `scripts/test-catalog-reader.sh` — smoke-test of the enable/disable
+  resolution logic against fixtures.
+- CI jobs: `catalog-validate`, `provision-syntax` (bash -n + shellcheck
+  errors-only on `provision.sh` and `scripts/*.sh`).
+- Vagrantfile forwards `GENESIS_ENABLE` / `GENESIS_DISABLE` / skip flags
+  from the host shell into the VM provisioner, so VM-mode respects the
+  same wizard flags as WSL-mode.
+
+### Changed
+- `provision.sh` default behavior with catalog present is byte-identical
+  to v0.2.0: same 6 skills, 3 MCPs, 4 agents installed. Verified by
+  `test-catalog-reader.sh`.
+
+### Not yet changed
+- `mcp/registry.json` still exists but is no longer read by the
+  provisioner. Scheduled for removal in milestone 2.4 (tag `v0.3.0`).
+
+## [0.2.0] — Phase 1 release (main)
 
 ### Added
 - Initial repo scaffold: `setup/`, `mcp/`, `agents/`, `templates/`, `vendor/`, `config/`, `docs/`, `.github/workflows/`.

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "kind": "mcps",
+  "items": [
+    {
+      "name": "fetch",
+      "scope": "user",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "default": true,
+      "tags": ["bundled", "web"],
+      "label": "Fetch - HTTP/URL fetching"
+    },
+    {
+      "name": "git",
+      "scope": "user",
+      "command": "uvx",
+      "args": ["mcp-server-git"],
+      "default": true,
+      "tags": ["bundled", "vcs"],
+      "label": "Git - repository operations"
+    },
+    {
+      "name": "playwright",
+      "scope": "user",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "default": true,
+      "tags": ["bundled", "browser"],
+      "label": "Playwright - browser automation"
+    }
+  ]
+}

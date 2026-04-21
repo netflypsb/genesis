@@ -34,3 +34,27 @@ jobs:
             echo "Validating $f"
             python -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
           done
+
+  catalog-validate:
+    name: Validate catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y jq
+      - name: Structural + source-path check
+        run: bash scripts/validate-catalog.sh
+      - name: Catalog reader smoke test
+        run: bash scripts/test-catalog-reader.sh
+
+  provision-syntax:
+    name: provision.sh shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n
+        run: bash -n provision.sh
+      - name: shellcheck (warnings allowed)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          shellcheck -S error provision.sh scripts/*.sh || true
